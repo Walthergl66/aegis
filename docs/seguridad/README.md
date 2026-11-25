@@ -16,6 +16,7 @@ Este documento resume controles presentes en la aplicación; el perímetro de re
 - `BACKUP_ENCRYPTION_KEY` protege backups locales y self-backup. Debe ser distinta de la anterior.
 - `SESSION_SECRET` firma JWT; cambiarla invalida tokens emitidos.
 - No registrar claves o connection strings: `sanitize.py` redacta secretos antes de mensajes sensibles y la API oculta credenciales completas.
+- En el proveedor PostgreSQL, el parser separa credenciales de la URI y exporta la contraseña como `PGPASSWORD`; no la coloca en el argv de `pg_dump` ni `psql`. El mensaje con URI enviada al flujo `/addbd` se borra al procesarla.
 - Backups temporales existen en claro mientras se construyen; tras cifrarlos se eliminan. Un barrido al arranque elimina restos de interrupciones.
 - Para envíos a Telegram, el archivo se descifra en memoria; el adjunto enviado contiene datos en claro, así que los destinatarios de admin deben ser confiables.
 
