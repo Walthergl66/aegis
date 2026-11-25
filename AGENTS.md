@@ -4,7 +4,8 @@
 
 - `backend/` contains the Python application. `api/routes/` holds FastAPI endpoints, `services/` contains business and provider logic, and `backup/`, `bot/`, `notify/`, and `core/` hold their respective responsibilities.
 - `backend/db/schema.sql` defines the SQLite schema. `backend/tests/` contains pytest tests and shared fixtures in `conftest.py`.
-- `frontend/src/` contains the React application, organized into `components/`, `features/`, `services/`, and `utils/`. Static assets live in `frontend/public/`.
+- `frontend/src/` contains the transitional React web panel, organized into `components/`, `features/`, `services/`, and `utils/`. The target product is native mobile only; retire the web panel after mobile feature parity and keep the API privately reachable.
+- `mobile/` contains the target Expo/React Native client for Android and iOS; it calls the same API through `EXPO_PUBLIC_API_URL`.
 - Docker configuration is at the repository root and in each component directory. Runtime data belongs in `data/`, not source directories.
 
 ## Build, Test, and Development Commands
