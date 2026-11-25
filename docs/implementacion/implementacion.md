@@ -6,11 +6,14 @@
 
 ## 1. Fijar el alcance y preparar una migración reversible
 
+- **Decisión para la primera entrega:** ampliar la PWA que ya existe y usarla como cliente móvil en Android e iOS. Evita mantener dos clientes mientras se valida el flujo. La decisión es reversible: si notificaciones push, almacenamiento seguro de refresh o transferencia de archivos no alcanzan los criterios en dispositivos reales, evaluar un cliente nativo compartido antes de ampliar el alcance.
+- **Alcance del piloto:** administrar conexiones PostgreSQL, probarlas, iniciar y consultar backups, ver historial y descargar archivos. Supabase queda como proveedor opcional. No retirar Telegram ni cambiar todavía el flujo de alertas.
 - Inventariar comandos, conversaciones, alertas, resumen diario, entrega de dumps y copia de SQLite del panel. Asociar cada flujo a una pantalla, permiso, destinatario y prueba de aceptación.
 - Identificar proyectos, cron, archivos cifrados y permisos existentes. Crear una copia recuperable de SQLite, resguardar por separado ambas claves Fernet y ensayar la migración sobre una copia. Conservar los identificadores para mantener el historial.
-- Acordar plataforma del primer piloto, distribución y conectividad. Como base de planificación se propone un cliente compartido para Android e iOS y acceso privado por HTTPS a través de Tailscale. La decisión entre ampliar la PWA existente y crear un cliente nativo se toma con una prueba en dispositivos de login, push y descarga de un archivo representativo.
+- Mantener el acceso privado por HTTPS a través de Tailscale durante el piloto. Validar en al menos un dispositivo Android y uno iOS: instalación de PWA, login/TOTP, reconexión tras suspensión y descarga de un archivo representativo.
+- Registrar los usuarios del piloto y sus permisos por proyecto. Confirmar la restauración de SQLite y de un dump en una base aislada antes de habilitar operaciones reales desde el teléfono.
 
-**Salida:** matriz de paridad aprobada, dispositivo piloto definido y recuperación del estado inicial ensayada.
+**Criterio de salida:** matriz de paridad aprobada, PWA instalada y recorrida en Android e iOS, recuperación del estado inicial ensayada y límites de distribución documentados. Si push o descarga no son fiables en alguno de los dispositivos, abrir la evaluación de cliente nativo antes de la fase 5.
 
 ## 2. Consolidar PostgreSQL como núcleo
 
