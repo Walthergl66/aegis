@@ -6,13 +6,14 @@ Guía de referencia del repositorio. Describe la implementación observada en el
 
 | Tema | Contenido |
 |---|---|
-| [Implementación de la app móvil](implementacion/implementacion.md) | Plan por fases para operar PostgreSQL desde el móvil, incorporar Supabase como extensión y retirar Telegram. |
+| [App móvil nativa](movil/README.md) | Scaffold Expo, configuración, sesión y estado funcional de Android/iOS. |
+| [Plan de implementación móvil](implementacion/implementacion.md) | Fases, estado actual, criterios de salida y trabajo pendiente para completar la experiencia móvil. |
 | [Arquitectura](arquitectura/README.md) | Componentes, flujo de arranque, límites entre capas y responsabilidades por módulo. |
 | [API y permisos](api/README.md) | Rutas REST, autenticación, roles y contrato con el frontend. |
 | [Datos y persistencia](datos/README.md) | Esquema SQLite, relaciones, migraciones y cifrado de campos. |
 | [Backups y planificación](backups/README.md) | Flujo de backup, verificación, retención, scheduler y copia remota. |
 | [Bot y notificaciones](bot/README.md) | Comandos, registro, autorización y mensajes operativos. |
-| [Frontend y PWA](frontend/README.md) | Rutas, pantallas, servicios y políticas de sesión/cache. |
+| [Frontend web y PWA](frontend/README.md) | Rutas del panel web, servicios y políticas de sesión/cache; la PWA no es el cliente móvil objetivo. |
 | [Seguridad](seguridad/README.md) | Controles, claves, sesiones, límites y datos sensibles. |
 | [Configuración](configuracion/README.md) | Variables, valores por defecto y efectos de rotación. |
 | [Instalación y operación](operacion/README.md) | Entorno local, Docker, tareas frecuentes e incidentes. |
@@ -33,6 +34,7 @@ backend/db/schema.sql        esquema inicial SQLite
 frontend/src/features/       pantallas React por dominio
 frontend/src/services/       clientes HTTP por dominio
 frontend/src/components/     layout y componentes compartidos
+mobile/                      app nativa Expo/React Native Android e iOS
 docs/                        documentación funcional y operativa
 data/                         volumen de runtime, fuera de Git
 ```
