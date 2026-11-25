@@ -67,6 +67,7 @@ Las rutas web no deben contener SQL de persistencia: usan `services/`. Las funci
 |---|---|
 | `backup/runner.py` | `pg_dump`, verificación con `pg_restore`, generación SQL, cifrado, rotación local y locks por proyecto. |
 | `backup/scheduler_jobs.py` | Resincronización de crons por proyecto y registro/alerta de cada resultado automático. |
+| `backup/web_jobs.py` | Worker async que reclama solicitudes persistidas y ejecuta el runner en un hilo. |
 | `backup/self_backup.py` | Snapshot cifrado de SQLite del panel, rotación y envío opcional a admins. |
 | `backup/offsite.py` | Listado/subida S3 compatible y retención remota por proyecto. |
 | `backup/cleanup.py` | Eliminación de restos en claro al inicio. |
