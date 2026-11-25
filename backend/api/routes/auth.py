@@ -8,6 +8,8 @@ Protección anti fuerza bruta (en capas):
 
 from __future__ import annotations
 
+import sqlite3
+
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
@@ -21,11 +23,10 @@ from services import access_blacklist
 from services import audit as audit_srv
 from services import refresh_tokens
 from services import web_users as web_users_srv
+from services import ownership as ownership_srv
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-_REFRESH_COOKIE = "sb_refresh_token"
-_NATIVE_CLIENT = "native"
 
 
 def _qr_svg_data_uri(content: str) -> str:
@@ -43,14 +44,35 @@ def _qr_svg_data_uri(content: str) -> str:
     return "data:image/svg+xml;charset=utf-8," + urllib.parse.quote(buf.getvalue().decode("utf-8"))
 
 
-def _cookie_kwargs(request: Request) -> dict:
-    """Cookie HttpOnly/SameSite=Strict, Secure solo sobre HTTPS."""
-    return {
-        "path": "/api/auth",
-        "httponly": True,
-        "samesite": "strict",
-        "secure": request.url.scheme == "https",
+@router.post("/register")
+@limiter.limit("3/hour")
+async def register(request: Request):
+    """Crea una cuenta personal para usar la app desde varios dispositivos."""
+    data = await request.json()
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
+    if not username or not password:
+        return JSONResponse({"detail": "Usuario y contraseña son obligatorios."}, status_code=400)
+    try:
+        user_id = web_users_srv.create_web_user(username, password, rol="admin")
+    except web_users_srv.WebUserError as exc:
+        return JSONResponse({"detail": str(exc)}, status_code=400)
+    except sqlite3.IntegrityError:
+        return JSONResponse({"detail": "No se pudo crear la cuenta. Elige otro usuario."}, status_code=409)
+
+    ownership_srv.claim_unowned_resources(user_id)
+    user = web_users_srv.get_web_user_by_id(user_id)
+    refresh = refresh_tokens.refresh_store.create(user)
+    payload = {
+        "access_token": create_token(user),
+        "refresh_token": refresh,
+        "expires_in": settings().jwt_ttl_seconds,
+        "token_type": "bearer",
+        "user": {"id": user["id"], "username": user["username"], "rol": user["rol"],
+                 "totp_enabled": bool(user.get("totp_enabled"))},
     }
+    audit_srv.log_action("account_register", "ok", web_user_id=user_id)
+    return JSONResponse(payload, status_code=201)
 
 
 @router.post("/login")
@@ -118,7 +140,6 @@ async def login(request: Request):
 
     web_users_srv.reset_failed_logins(username, ip)
     token = create_token(user)
-    native_client = data.get("client_type") == _NATIVE_CLIENT
     payload = {
             "access_token": token,
             "expires_in": settings().jwt_ttl_seconds,
@@ -127,12 +148,8 @@ async def login(request: Request):
                      "totp_enabled": bool(user.get("totp_enabled"))},
         }
     refresh = refresh_tokens.refresh_store.create(user)
-    if native_client:
-        payload["refresh_token"] = refresh
+    payload["refresh_token"] = refresh
     response = JSONResponse(payload)
-    response.set_cookie(
-        _REFRESH_COOKIE, refresh, max_age=settings().refresh_ttl_seconds, **_cookie_kwargs(request)
-    )
     audit_srv.log_action("web_login", "ok", web_user_id=user["id"])
     return response
 
@@ -146,19 +163,19 @@ async def me(user: dict = Depends(get_current_user)) -> dict:
 
 @router.post("/refresh")
 async def refresh_token(request: Request):
-    """Renueva el access token con cookie web o token opaco del cliente nativo."""
+    """Renueva el access token usando el refresh token nativo."""
     try:
         data = await request.json()
     except Exception:  # noqa: BLE001
         data = {}
-    raw = request.cookies.get(_REFRESH_COOKIE) or data.get("refresh_token")
+    raw = data.get("refresh_token")
     rotated = refresh_tokens.refresh_store.validate_and_rotate(raw) if raw else None
     if rotated is None:
         return JSONResponse({"detail": "Sesión expirada."}, status_code=401)
     new_refresh, entry = rotated
     raw_user = web_users_srv.get_web_user_by_id(entry["user_id"])
     # Si el usuario fue eliminado o desactivado, se rechaza la renovación y se
-    # revoca la sesión: no seguimos rotando cookies de forma inútil.
+    # revoca la sesión: no seguimos rotando tokens de forma inútil.
     if raw_user is None or not raw_user.get("activo"):
         refresh_tokens.refresh_store.revoke(new_refresh)
         return JSONResponse({"detail": "Sesión expirada."}, status_code=401)
@@ -169,7 +186,6 @@ async def refresh_token(request: Request):
         "totp_enabled": bool(raw_user.get("totp_enabled")),
     }
     token = create_token(user)
-    native_client = bool(data.get("refresh_token"))
     payload = {
             "access_token": token,
             "expires_in": settings().jwt_ttl_seconds,
@@ -177,13 +193,8 @@ async def refresh_token(request: Request):
             "user": {"id": user["id"], "username": user["username"], "rol": user["rol"],
                      "totp_enabled": bool(user.get("totp_enabled"))},
         }
-    if native_client:
-        payload["refresh_token"] = new_refresh
-    response = JSONResponse(payload)
-    response.set_cookie(
-        _REFRESH_COOKIE, new_refresh, max_age=settings().refresh_ttl_seconds, **_cookie_kwargs(request)
-    )
-    return response
+    payload["refresh_token"] = new_refresh
+    return JSONResponse(payload)
 
 
 @router.post("/totp/setup")
@@ -242,12 +253,11 @@ async def totp_disable(request: Request, user: dict = Depends(get_current_user))
 
 @router.post("/logout")
 async def logout(request: Request):
-    raw = request.cookies.get(_REFRESH_COOKIE)
     try:
         data = await request.json()
     except Exception:  # noqa: BLE001
         data = {}
-    raw = raw or data.get("refresh_token")
+    raw = data.get("refresh_token")
     if raw:
         refresh_tokens.refresh_store.revoke(raw)
     # Invalida también el access token presente (si lo hay) en el header.
@@ -261,6 +271,4 @@ async def logout(request: Request):
         else:
             if claims.get("jti"):
                 access_blacklist.blacklist.revoke(claims["jti"], int(claims.get("exp", 0)))
-    response = JSONResponse({"ok": True})
-    response.delete_cookie(_REFRESH_COOKIE, path="/api/auth")
-    return response
+    return JSONResponse({"ok": True})

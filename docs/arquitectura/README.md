@@ -12,17 +12,17 @@ App nativa (Expo Android/iOS) ── HTTPS /api/* ──► acceso privado (Tail
                                                    └── pg_dump/pg_restore ── PostgreSQL
                                                                  └──────── S3 opcional
 
-Transición actual: SPA web + nginx y polling de Telegram siguen en el despliegue
-hasta completar la paridad móvil. No forman parte de la arquitectura final.
+El cliente web fue retirado. Telegram permanece como integración de operación
+y alertas; la app móvil es el único cliente de producto.
 ```
 
-Compose tiene hoy dos contenedores: `backend` y `frontend`. Durante la transición `main.py` coordina FastAPI, el polling de Telegram y APScheduler en un proceso/event loop. El destino conserva API y scheduler en el backend único, pero retira el contenedor de interfaz web y Telegram. Los trabajos bloqueantes de DB, `pg_dump` y algunos clientes se envían a hilos cuando se invocan desde tareas async. SQLite usa conexiones breves por operación, WAL, foreign keys y busy timeout.
+Compose ejecuta un único contenedor `backend`. `main.py` coordina FastAPI, polling de Telegram y APScheduler en un proceso/event loop. Los trabajos bloqueantes de DB, `pg_dump` y algunos clientes se envían a hilos cuando se invocan desde tareas async. SQLite usa conexiones breves por operación, WAL, foreign keys y busy timeout.
 
 ## Arranque del backend
 
 `backend/main.py` ejecuta, en orden: configuración/logging; inicialización y migración SQLite; creación del primer admin web; self-backup inicial si falta; purga de retención; barrido de restos de backups en claro; sincronización off-site opcional; creación de FastAPI y bot; scheduler y resincronización de crons de proyectos; inicio del polling y servicio Uvicorn. Al apagar el servidor cancela el polling y el scheduler.
 
-Hoy nginx sirve React/Vite y enruta `/api/` hacia `backend:8080`; solo el frontend publica loopback. Al retirar la SPA, cambiar a un gateway API mínimo o publicar el backend exclusivamente en loopback para Tailscale Serve. Verificar antes proxy headers confiables, límites, cabeceras de seguridad, HTTPS y timeouts. La app nativa en `mobile/` es el único cliente final y llama a la API mediante `EXPO_PUBLIC_API_URL`.
+La API FastAPI publica solo JSON y se enlaza a `127.0.0.1:8080`. El acceso remoto debe ir por Tailscale Serve; no publicar directamente el backend a Internet. La app nativa en `mobile/` llama a la API mediante `EXPO_PUBLIC_API_URL`.
 
 ## Capas del backend
 
@@ -33,12 +33,12 @@ Hoy nginx sirve React/Vite y enruta `/api/` hacia `backend:8080`; solo el fronte
 | `core/crypto.py`, `jwt.py`, `security.py`, `sanitize.py` | Cifrado de secretos/archivos, tokens, contraseñas y limpieza de mensajes. |
 | `services/` | Persistencia y operaciones para cuentas, proyectos, usuarios, permisos, sesiones, historial, auditoría e integración de proveedores. |
 | `services/providers/` | Contrato común y adaptadores para PostgreSQL directo y Supabase. PostgreSQL provee conexión/prueba; Supabase añade importación y estado cloud. |
-| `api/app.py`, `api/routes/`, `api/deps.py` | API JSON, middleware y control de acceso web. |
+| `api/app.py`, `api/routes/`, `api/deps.py` | API JSON, middleware y control de acceso. |
 | `backup/` | Motor `pg_dump`, crons por proyecto, self-backup, limpieza y transferencia S3 compatible. |
 | `bot/` | Construcción de la aplicación Telegram, comandos y conversaciones. |
 | `notify/` | Mensajes/documentos a admins y resumen diario. |
 
-Las rutas web no deben contener SQL de persistencia: usan `services/`. Las funciones en `services/` son la capa de persistencia de dominio y usan `core.db`.
+Las rutas de API no deben contener SQL de persistencia: usan `services/`. Las funciones en `services/` son la capa de persistencia de dominio y usan `core.db`.
 
 ### Inventario de servicios
 
@@ -47,7 +47,7 @@ Las rutas web no deben contener SQL de persistencia: usan `services/`. Las funci
 | `services/accounts.py` | CRUD de cuentas y acceso al PAT descifrado para integraciones internas. |
 | `services/projects.py` | CRUD, validación/generación de slug y cron, archivado/restauración y estado derivado de proyectos. |
 | `services/users.py` | Identidad Telegram, permisos por proyecto, PAT del usuario y resolución de admins. |
-| `services/web_users.py` | Usuarios del panel, autenticación, bloqueo de login y funciones TOTP. |
+| `services/web_users.py` | Cuentas de acceso a la app, autenticación, bloqueo de login y funciones TOTP (nombre histórico). |
 | `services/supabase_api.py` | Cliente de Management API: valida PAT, lista proyectos y obtiene connection strings del pooler. |
 | `services/providers/base.py` | Tipos de capacidades disponibles y resultado de prueba de conexión. |
 | `services/providers/postgres.py` | Parseo/validación de URI PostgreSQL, parámetros de libpq, conexión de prueba y estado cloud no aplicable. |
@@ -79,15 +79,13 @@ Los proyectos genéricos se asocian al grupo del sistema **Conexiones directas**
 
 ## Recorrido de una acción
 
-1. React llama al cliente de su dominio en `frontend/src/services/`.
-2. `http.js` agrega Bearer, incluye cookies y renueva el access token al recibir 401.
-3. nginx pasa `/api/*` al backend.
-4. La ruta FastAPI valida el cuerpo/permiso, llama a un service y devuelve JSON.
-5. Para un backup, la ruta o el bot consulta el proyecto, resuelve sus credenciales cifradas desde el service y llama al runner; el resultado se registra en historial y auditoría.
+1. La app móvil envía requests JSON con Bearer y renueva el access token al recibir 401.
+2. La ruta FastAPI valida el cuerpo/permiso, llama a un service y devuelve JSON.
+3. Para un backup, la ruta, scheduler o bot consulta el proyecto, resuelve sus credenciales cifradas desde el service y llama al runner; el resultado se registra en historial y auditoría.
 
 ## Fuentes de verdad
 
 - Esquema inicial: `backend/db/schema.sql`; cambios posteriores: `backend/core/db.py`.
 - Rutas y contratos: decoradores en `backend/api/routes/` y `backend/api/app.py`.
 - Configuración real: `backend/core/config.py` más plantilla `backend/.env.example`.
-- Topología y hardening Docker/nginx: `docker-compose.yml`, `backend/Dockerfile`, `frontend/Dockerfile` y `frontend/nginx.conf`.
+- Topología y hardening Docker: `docker-compose.yml` y `backend/Dockerfile`.

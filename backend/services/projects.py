@@ -194,11 +194,17 @@ def _base_select(last_backup_join: bool = True) -> str:
     )
 
 
-def _resolve_account(account_id: int | None, provider: str) -> int:
+def _resolve_account(
+    account_id: int | None, provider: str, owner_user_id: int | None = None
+) -> int:
     if account_id:
-        account = db.fetch_one("SELECT id, provider FROM accounts WHERE id = ?", (account_id,))
+        account = db.fetch_one(
+            "SELECT id, provider, owner_user_id FROM accounts WHERE id = ?", (account_id,)
+        )
         if account is None:
             raise ProjectError("La cuenta asociada no existe.")
+        if owner_user_id is not None and account["owner_user_id"] != owner_user_id:
+            raise ProjectError("La cuenta asociada no pertenece a tu usuario.")
         account_provider = account["provider"] if "provider" in account.keys() else "supabase"
         if account_provider != provider:
             raise ProjectError(
@@ -212,7 +218,7 @@ def _resolve_account(account_id: int | None, provider: str) -> int:
         raise ProjectError("La cuenta es obligatoria para proyectos Supabase.")
     from services import accounts as accounts_srv
 
-    return accounts_srv.ensure_default_group()
+    return accounts_srv.ensure_default_group(owner_user_id)
 
 
 def is_supabase_project(project: dict) -> bool:
@@ -233,6 +239,7 @@ def create_project(
     schedule: str | None = None,
     provider: str | None = None,
     backup_options=None,
+    owner_user_id: int | None = None,
 ) -> int:
     slug = slug.strip()
     nombre = (nombre or "").strip()
@@ -255,17 +262,24 @@ def create_project(
     _validate_connection(connection)
     if provider == "supabase" and not project_ref:
         raise ProjectError("La referencia del proyecto (project_ref) es obligatoria para Supabase.")
-    existing = db.fetch_one("SELECT id FROM projects WHERE slug = ?", (slug,))
+    existing = db.fetch_one(
+        "SELECT id, owner_user_id FROM projects WHERE slug = ?", (slug,)
+    )
     if existing is not None:
-        raise ProjectError(f"Ya existe un proyecto con el slug '{slug}'.")
+        if owner_user_id is None or existing["owner_user_id"] == owner_user_id:
+            raise ProjectError(f"Ya existe un proyecto con el slug '{slug}'.")
+        suffix = f"-u{owner_user_id}"
+        slug = slug[:MAX_SLUG_LENGTH - len(suffix)] + suffix
+        if db.fetch_one("SELECT id FROM projects WHERE slug = ?", (slug,)) is not None:
+            raise ProjectError("Ya existe un proyecto con un slug equivalente.")
 
-    account_id = _resolve_account(account_id, provider)
+    account_id = _resolve_account(account_id, provider, owner_user_id)
     options = _normalize_backup_options(backup_options, provider)
     return db.execute(
         """
         INSERT INTO projects (slug, nombre, provider, account_id, connection_encrypted,
-                              project_ref, backup_options, schedule)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                              project_ref, backup_options, schedule, owner_user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             slug,
@@ -276,14 +290,22 @@ def create_project(
             project_ref,
             json.dumps(options) if options else None,
             schedule,
+            owner_user_id,
         ),
     )
 
 
-def get_project(project_id: int, include_secret: bool = False) -> dict | None:
+def get_project(
+    project_id: int, include_secret: bool = False, owner_user_id: int | None = None
+) -> dict | None:
+    where = "WHERE p.id = ?"
+    params: tuple = (project_id,)
+    if owner_user_id is not None:
+        where += " AND p.owner_user_id = ?"
+        params += (owner_user_id,)
     row = db.fetch_one(
-        f"{_base_select()} WHERE p.id = ?",
-        (project_id,),
+        f"{_base_select()} {where}",
+        params,
     )
     return _dict(row, include_secret=include_secret)
 
@@ -296,10 +318,17 @@ def get_by_slug(slug: str) -> dict | None:
     return _dict(row)
 
 
-def list_projects(only_active: bool = True, provider: str | None = None) -> list[dict]:
+def list_projects(
+    only_active: bool = True,
+    provider: str | None = None,
+    owner_user_id: int | None = None,
+) -> list[dict]:
     sql = _base_select()
     where: list[str] = []
     params: list = []
+    if owner_user_id is not None:
+        where.append("p.owner_user_id = ?")
+        params.append(owner_user_id)
     if only_active:
         where.append("p.activo = 1")
     if provider:
@@ -322,8 +351,14 @@ def update_project(
     schedule: str | None = None,
     provider: str | None = None,
     backup_options=None,
+    owner_user_id: int | None = None,
 ) -> None:
-    current = db.fetch_one("SELECT * FROM projects WHERE id = ?", (project_id,))
+    sql = "SELECT * FROM projects WHERE id = ?"
+    params: tuple = (project_id,)
+    if owner_user_id is not None:
+        sql += " AND owner_user_id = ?"
+        params += (owner_user_id,)
+    current = db.fetch_one(sql, params)
     if current is None:
         raise ProjectError("El proyecto no existe.")
 
@@ -362,11 +397,11 @@ def update_project(
     )
     new_account_id = current["account_id"]
     if account_id is not None:
-        new_account_id = _resolve_account(account_id, new_provider)
+        new_account_id = _resolve_account(account_id, new_provider, owner_user_id)
     elif new_provider != current_provider:
         # Al cambiar de proveedor sin indicar cuenta, se resuelve una
         # compatible (grupo por defecto para PostgreSQL directo).
-        new_account_id = _resolve_account(None, new_provider)
+        new_account_id = _resolve_account(None, new_provider, owner_user_id)
 
     if backup_options is None:
         new_backup_options = (
@@ -401,24 +436,37 @@ def update_project(
     )
 
 
-def delete_project(project_id: int) -> None:
+def delete_project(project_id: int, owner_user_id: int | None = None) -> None:
     """Eliminación lógica: desactiva el proyecto y libera el slug.
 
     El historial de backups y el audit_log se conservan intactos.
     """
-    current = db.fetch_one("SELECT * FROM projects WHERE id = ?", (project_id,))
+    sql = "SELECT * FROM projects WHERE id = ?"
+    params: tuple = (project_id,)
+    if owner_user_id is not None:
+        sql += " AND owner_user_id = ?"
+        params += (owner_user_id,)
+    current = db.fetch_one(sql, params)
     if current is None:
         raise ProjectError("El proyecto no existe.")
     archived_slug = f"(eliminado)-{current['id']}-{current['slug']}"
     db.execute(
-        "UPDATE projects SET activo = 0, archived = 1, slug = ? WHERE id = ?",
-        (archived_slug, project_id),
+        "UPDATE projects SET activo = 0, archived = 1, slug = ? WHERE id = ?"
+        + (" AND owner_user_id = ?" if owner_user_id is not None else ""),
+        (archived_slug, project_id) + ((owner_user_id,) if owner_user_id is not None else ()),
     )
 
 
-def restore_project(project_id: int, slug: str | None = None) -> None:
+def restore_project(
+    project_id: int, slug: str | None = None, owner_user_id: int | None = None
+) -> None:
     """Reactivación desde la vista de proyectos eliminados."""
-    current = db.fetch_one("SELECT * FROM projects WHERE id = ?", (project_id,))
+    sql = "SELECT * FROM projects WHERE id = ?"
+    params: tuple = (project_id,)
+    if owner_user_id is not None:
+        sql += " AND owner_user_id = ?"
+        params += (owner_user_id,)
+    current = db.fetch_one(sql, params)
     if current is None:
         raise ProjectError("El proyecto no existe.")
     candidate = (slug or "").strip() or re.sub(r"^\(eliminado\)-\d+-", "", current["slug"] or "")
@@ -428,8 +476,9 @@ def restore_project(project_id: int, slug: str | None = None) -> None:
     if clash is not None:
         raise ProjectError(f"El slug '{candidate}' ya está en uso por otro proyecto.")
     db.execute(
-        "UPDATE projects SET activo = 1, archived = 0, slug = ? WHERE id = ?",
-        (candidate, project_id),
+        "UPDATE projects SET activo = 1, archived = 0, slug = ? WHERE id = ?"
+        + (" AND owner_user_id = ?" if owner_user_id is not None else ""),
+        (candidate, project_id) + ((owner_user_id,) if owner_user_id is not None else ()),
     )
 
 
@@ -442,7 +491,7 @@ def last_backup_ok(project_id: int) -> str | None:
 
 
 def project_extra_status(project_id: int) -> dict:
-    """Datos de estado no sensibles para el panel web."""
+    """Datos de estado no sensibles para los clientes de la API."""
     history = db.fetch_all(
         "SELECT resultado, COUNT(*) AS c FROM backup_history WHERE project_id = ? GROUP BY resultado",
         (project_id,),

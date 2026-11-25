@@ -55,7 +55,9 @@ def _row_to_dict_plain(row) -> dict | None:
     }
 
 
-def create_account(nombre: str, pat: str, provider: str = "supabase") -> int:
+def create_account(
+    nombre: str, pat: str, provider: str = "supabase", owner_user_id: int | None = None
+) -> int:
     provider = _validate_provider(provider)
     nombre = nombre.strip()
     pat = (pat or "").strip()
@@ -67,7 +69,14 @@ def create_account(nombre: str, pat: str, provider: str = "supabase") -> int:
     if provider == "supabase":
         # Reutiliza la cuenta activa que ya tenga este mismo PAT para no
         # duplicar registros al reimportar (p. ej. tras eliminar un proyecto).
-        for row in db.fetch_all("SELECT * FROM accounts WHERE activo = 1"):
+        if owner_user_id is None:
+            rows = db.fetch_all("SELECT * FROM accounts WHERE activo = 1")
+        else:
+            rows = db.fetch_all(
+                "SELECT * FROM accounts WHERE activo = 1 AND owner_user_id = ?",
+                (owner_user_id,),
+            )
+        for row in rows:
             data = _row_to_dict_plain(row)
             if data and data["pat"] == pat:
                 if data["nombre"] != nombre or data["provider"] != provider:
@@ -79,26 +88,39 @@ def create_account(nombre: str, pat: str, provider: str = "supabase") -> int:
     else:
         # Los grupos genéricos se deduplican por nombre y proveedor.
         existing = db.fetch_one(
-            "SELECT id FROM accounts WHERE activo = 1 AND provider = ? AND nombre = ?",
-            (provider, nombre),
+            "SELECT id FROM accounts WHERE activo = 1 AND provider = ? AND nombre = ? "
+            "AND owner_user_id IS ?",
+            (provider, nombre, owner_user_id),
         )
         if existing is not None:
             return existing["id"]
 
     return db.execute(
-        "INSERT INTO accounts (nombre, provider, pat_encrypted) VALUES (?, ?, ?)",
-        (nombre, provider, crypto.encrypt(pat)),
+        "INSERT INTO accounts (nombre, provider, pat_encrypted, owner_user_id) "
+        "VALUES (?, ?, ?, ?)",
+        (nombre, provider, crypto.encrypt(pat), owner_user_id),
     )
 
 
-def get_account(account_id: int) -> dict | None:
-    return _row_to_dict(db.fetch_one("SELECT * FROM accounts WHERE id = ?", (account_id,)))
+def get_account(account_id: int, owner_user_id: int | None = None) -> dict | None:
+    sql = "SELECT * FROM accounts WHERE id = ?"
+    params: tuple = (account_id,)
+    if owner_user_id is not None:
+        sql += " AND owner_user_id = ?"
+        params += (owner_user_id,)
+    return _row_to_dict(db.fetch_one(sql, params))
 
 
-def list_accounts() -> list[dict]:
+def list_accounts(owner_user_id: int | None = None) -> list[dict]:
+    sql = "SELECT * FROM accounts"
+    params: tuple = ()
+    if owner_user_id is not None:
+        sql += " WHERE owner_user_id = ?"
+        params = (owner_user_id,)
+    sql += " ORDER BY provider, nombre"
     return [
         _row_to_dict(r)
-        for r in db.fetch_all("SELECT * FROM accounts ORDER BY provider, nombre")
+        for r in db.fetch_all(sql, params)
     ]
 
 
@@ -107,8 +129,14 @@ def update_account(
     nombre: str | None = None,
     pat: str | None = None,
     provider: str | None = None,
+    owner_user_id: int | None = None,
 ) -> None:
-    current = db.fetch_one("SELECT * FROM accounts WHERE id = ?", (account_id,))
+    sql = "SELECT * FROM accounts WHERE id = ?"
+    params: tuple = (account_id,)
+    if owner_user_id is not None:
+        sql += " AND owner_user_id = ?"
+        params += (owner_user_id,)
+    current = db.fetch_one(sql, params)
     if current is None:
         raise AccountError("La cuenta no existe.")
 
@@ -124,22 +152,27 @@ def update_account(
         raise AccountError("El Personal Access Token es obligatorio para cuentas Supabase.")
 
     db.execute(
-        "UPDATE accounts SET nombre = ?, provider = ?, pat_encrypted = ? WHERE id = ?",
-        (new_nombre, new_provider, new_pat_encrypted, account_id),
+        "UPDATE accounts SET nombre = ?, provider = ?, pat_encrypted = ? WHERE id = ?"
+        + (" AND owner_user_id = ?" if owner_user_id is not None else ""),
+        (new_nombre, new_provider, new_pat_encrypted, account_id)
+        + ((owner_user_id,) if owner_user_id is not None else ()),
     )
 
 
-def delete_account(account_id: int) -> None:
+def delete_account(account_id: int, owner_user_id: int | None = None) -> None:
+    owner_clause = " AND owner_user_id = ?" if owner_user_id is not None else ""
+    params: tuple = (account_id,) + ((owner_user_id,) if owner_user_id is not None else ())
     count = db.fetch_one(
-        "SELECT COUNT(*) AS c FROM projects WHERE account_id = ?", (account_id,)
+        "SELECT COUNT(*) AS c FROM projects WHERE account_id = ?" + owner_clause,
+        params,
     )
     if count and count["c"] > 0:
         raise AccountError(
             "No se puede eliminar: la cuenta tiene proyectos asociados. "
             "Elimina primero (o reasigna) sus proyectos."
         )
-    db.execute("UPDATE accounts SET activo = 0 WHERE id = ?", (account_id,))
-    db.execute("DELETE FROM accounts WHERE id = ?", (account_id,))
+    db.execute("UPDATE accounts SET activo = 0 WHERE id = ?" + owner_clause, params)
+    db.execute("DELETE FROM accounts WHERE id = ?" + owner_clause, params)
 
 
 def get_plaintext_pat(account_id: int) -> str:
@@ -154,15 +187,21 @@ def has_pat(account_id: int) -> bool:
     return bool(get_plaintext_pat(account_id))
 
 
-def ensure_default_group() -> int:
-    """Devuelve el id del grupo de conexiones PostgreSQL directas.
-
-    Lo crea si no existe. Es el destino por defecto de los proyectos que no
-    pertenecen a un proveedor cloud.
-    """
-    existing = db.fetch_one(
-        "SELECT id FROM accounts WHERE provider = 'postgres' ORDER BY id LIMIT 1"
-    )
+def ensure_default_group(owner_user_id: int | None = None) -> int:
+    """Devuelve el grupo PostgreSQL directo del usuario, creándolo si falta."""
+    if owner_user_id is None:
+        existing = db.fetch_one(
+            "SELECT id FROM accounts WHERE provider = 'postgres' AND owner_user_id IS NULL "
+            "ORDER BY id LIMIT 1"
+        )
+    else:
+        existing = db.fetch_one(
+            "SELECT id FROM accounts WHERE provider = 'postgres' AND owner_user_id = ? "
+            "ORDER BY id LIMIT 1",
+            (owner_user_id,),
+        )
     if existing is not None:
         return existing["id"]
-    return create_account(db.DEFAULT_GROUP_NAME, "", provider="postgres")
+    return create_account(
+        db.DEFAULT_GROUP_NAME, "", provider="postgres", owner_user_id=owner_user_id
+    )

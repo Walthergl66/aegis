@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api/backups", tags=["backups"])
 
 @router.get("/jobs/{job_id}")
 async def get_backup_job(job_id: str, user: dict = Depends(get_current_user)):
-    job = jobs_srv.get(job_id)
+    job = jobs_srv.get(job_id, owner_user_id=user["id"])
     if job is None:
         raise HTTPException(status_code=404, detail="Trabajo de backup no encontrado.")
     return job
@@ -34,8 +34,9 @@ async def download_backup(
 ):
     row = db.fetch_one(
         """SELECT bh.*, p.slug FROM backup_history bh
-           JOIN projects p ON p.id = bh.project_id WHERE bh.id = ?""",
-        (backup_id,),
+           JOIN projects p ON p.id = bh.project_id
+           WHERE bh.id = ? AND p.owner_user_id = ?""",
+        (backup_id, admin["id"]),
     )
     if row is None or row["resultado"] != "ok":
         raise HTTPException(status_code=404, detail="Backup no encontrado.")
@@ -73,7 +74,7 @@ async def download_backup(
 
 def _relative_ruta(ruta: str | None) -> str | None:
     """Expone la ruta RELATIVA a BACKUP_DIR: no se filtran rutas absolutas del
-    servidor (estructura interna) a los usuarios del panel."""
+    servidor (estructura interna) a los clientes."""
     if not ruta:
         return ruta
     base = Path(settings().backup_dir)
@@ -97,12 +98,17 @@ async def list_backups(
         """
         SELECT bh.*, p.slug
         FROM backup_history bh JOIN projects p ON p.id = bh.project_id
+        WHERE p.owner_user_id = ?
         ORDER BY bh.fecha DESC, bh.id DESC
         LIMIT ? OFFSET ?
         """,
-        (page_size, offset),
+        (user["id"], page_size, offset),
     )
-    total = db.fetch_one("SELECT COUNT(*) AS c FROM backup_history")
+    total = db.fetch_one(
+        "SELECT COUNT(*) AS c FROM backup_history bh JOIN projects p ON p.id = bh.project_id "
+        "WHERE p.owner_user_id = ?",
+        (user["id"],),
+    )
     total_count = total["c"] if total else 0
     items = []
     for r in rows:

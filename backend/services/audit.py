@@ -24,9 +24,10 @@ def log_action(
     )
 
 
-def list_audit(limit: int = 100, offset: int = 0) -> list[dict]:
-    rows = db.fetch_all(
-        """
+def list_audit(
+    limit: int = 100, offset: int = 0, owner_user_id: int | None = None
+) -> list[dict]:
+    sql = """
         SELECT a.*,
                u.nombre   AS telegram_user,
                w.username AS web_user,
@@ -35,11 +36,16 @@ def list_audit(limit: int = 100, offset: int = 0) -> list[dict]:
         LEFT JOIN users      u ON u.id = a.user_id
         LEFT JOIN web_users  w ON w.id = a.web_user_id
         LEFT JOIN projects   p ON p.id = a.project_id
+    """
+    params: tuple = ()
+    if owner_user_id is not None:
+        sql += " WHERE a.web_user_id = ? OR p.owner_user_id = ? "
+        params = (owner_user_id, owner_user_id)
+    sql += """
         ORDER BY a.timestamp DESC, a.id DESC
         LIMIT ? OFFSET ?
-        """,
-        (limit, offset),
-    )
+        """
+    rows = db.fetch_all(sql, params + (limit, offset))
     return [_row_to_dict(r) for r in rows]
 
 
@@ -48,7 +54,7 @@ def _row_to_dict(row) -> dict:
     data = dict(row)
     data["fecha"] = row["timestamp"]
     if row["web_user"]:
-        data["origen"] = f"Web · {row['web_user']}"
+        data["origen"] = f"App · {row['web_user']}"
     elif row["telegram_user"]:
         data["origen"] = f"Telegram · {row['telegram_user']}"
     else:
@@ -58,6 +64,16 @@ def _row_to_dict(row) -> dict:
 
 def count_audit() -> int:
     row = db.fetch_one("SELECT COUNT(*) AS c FROM audit_log")
+    return row["c"] if row else 0
+
+
+def count_audit_for_user(owner_user_id: int) -> int:
+    row = db.fetch_one(
+        "SELECT COUNT(*) AS c FROM audit_log a "
+        "LEFT JOIN projects p ON p.id = a.project_id "
+        "WHERE a.web_user_id = ? OR p.owner_user_id = ?",
+        (owner_user_id, owner_user_id),
+    )
     return row["c"] if row else 0
 
 

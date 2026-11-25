@@ -1,6 +1,6 @@
 # Despliegue "Modelo A" + Runbook
 
-Estado de transición: este runbook mantiene el panel legado accesible solo por Tailscale. El objetivo de producto es operar desde la app móvil y retirar la SPA cuando tenga paridad.
+El panel web fue retirado. La app móvil consume la API privada, enlazada a loopback y accesible remotamente solo mediante Tailscale Serve.
 
 Objetivo de despliegue final: API privada para la app nativa en una **VM Oracle Cloud (Always Free, Ubuntu
 22.04/24.04)** accesible **solo por Tailscale** (sin exponer puertos a Internet), con
@@ -149,7 +149,7 @@ Los `.dump` son `pg_dump -Fc` (custom, comprimidos); los `.sql` son formato plan
 
 ### 5. Sospecha de fuerza bruta al panel
 - Si el backend alerta `Posible ataque de fuerza bruta`/`Tráfico sospechoso`, revisa los
-  logs por la IP reportada. El acceso real va por `tailscale serve`, con nginx
-  confiando solo en `set_real_ip_from` del loopback: IPs spoofeadas no engañan al rate-limit.
+  logs por la IP reportada. El acceso real va por `tailscale serve` hacia el backend
+  enlazado a loopback: IPs externas no alcanzan directamente la API.
 
 ---

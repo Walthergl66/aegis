@@ -34,6 +34,7 @@ from notify import telegram as notify_mod
 from notify.daily_summary import send_daily_summary as _send_daily_summary
 from services import audit as audit_srv
 from services import backup_history as history_srv
+from services import ownership as ownership_srv
 from services import refresh_tokens as refresh_srv
 from services import web_users as web_users_srv
 
@@ -71,23 +72,29 @@ def _setup_logging() -> None:
 
 
 def bootstrap_admin() -> None:
-    """Crea el primer usuario web si todavía no existe ninguno.
+    """Crea la primera cuenta de acceso si todavía no existe ninguna.
 
     Las credenciales vienen de .env (WEB_ADMIN_USERNAME / WEB_ADMIN_PASSWORD).
-    Si el password no está definido o no cumple la política de seguridad
-    (mínimo 12 caracteres), se genera uno aleatorio que se escribe en un
-    archivo provisional (nunca en app.log, que rota y persiste).
+    Si no se configuró una clave inicial, se habilita el registro desde la
+    app. Una contraseña configurada que no cumpla la política se reemplaza
+    con una clave provisional protegida junto a los datos.
     """
     if web_users_srv.count_web_users() > 0:
         return
     cfg = settings()
     username = cfg.web_admin_username or "admin"
     password = cfg.web_admin_password or ""
+    if not password:
+        logging.getLogger(__name__).info(
+            "No hay cuenta inicial configurada; la primera persona puede registrarse desde la app."
+        )
+        return
     provisional = False
     if len(password) < web_users_srv.MIN_PASSWORD_LENGTH:
         password = secrets.token_urlsafe(12)
         provisional = True
-    web_users_srv.create_web_user(username, password, rol="admin")
+    user_id = web_users_srv.create_web_user(username, password, rol="admin")
+    ownership_srv.claim_unowned_resources(user_id)
     audit_srv.log_action(
         "web_bootstrap_admin", "ok",
         detalle=f"se creó el usuario admin inicial '{username}'",
@@ -159,7 +166,7 @@ async def daily_summary_job(log: logging.Logger) -> None:
 
 
 async def daily_self_backup_job(log: logging.Logger) -> None:
-    """Self-backup diario de la base del panel + envío a Telegram (opcional)."""
+    """Self-backup diario de la base de datos + envío a Telegram (opcional)."""
     try:
         enc = await asyncio.to_thread(self_backup_mod.run_self_backup)
         if enc.exists():
@@ -170,7 +177,7 @@ async def daily_self_backup_job(log: logging.Logger) -> None:
         log.exception("Falló el self-backup diario de la base: %s", exc)
         try:
             await notify_mod.notify_admins(
-                "⚠️ Falló el self-backup diario de la base del panel. Revisa los logs del contenedor."
+                "⚠️ Falló el self-backup diario de la base. Revisa los logs del contenedor."
             )
         except Exception as notify_exc:  # noqa: BLE001
             log.error("Y además falló la alerta por Telegram: %s", notify_exc)
@@ -294,7 +301,7 @@ async def main() -> None:
     db_core.execute("UPDATE backup_jobs SET status = 'interrupted', finished_at = datetime('now'), detail = 'El proceso terminó durante la ejecución.' WHERE status = 'running'")
     backup_jobs_task = asyncio.create_task(web_jobs.run_forever())
     bot_task = asyncio.create_task(run_bot_forever(bot_app))
-    log.info("Interfaz web expuesta en http://%s:%s", cfg.web_host, cfg.web_port)
+    log.info("API móvil escuchando en http://%s:%s", cfg.web_host, cfg.web_port)
     try:
         await server.serve()
     finally:

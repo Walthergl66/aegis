@@ -16,7 +16,7 @@ from core.config import settings
 
 # Versión del esquema. Se incrementa con cada migración incremental para
 # poder auditar en qué estado está una base existente.
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # Cuenta/grupo por defecto para proyectos PostgreSQL sin proveedor cloud.
 DEFAULT_GROUP_NAME = "Conexiones directas"
@@ -57,6 +57,8 @@ def _migrate() -> None:
         "ALTER TABLE projects ADD COLUMN provider TEXT NOT NULL DEFAULT 'supabase'",
         "ALTER TABLE projects ADD COLUMN backup_options TEXT",
         "ALTER TABLE web_users ADD COLUMN totp_pending_secret TEXT",
+        "ALTER TABLE accounts ADD COLUMN owner_user_id INTEGER REFERENCES web_users(id) ON DELETE SET NULL",
+        "ALTER TABLE projects ADD COLUMN owner_user_id INTEGER REFERENCES web_users(id) ON DELETE SET NULL",
         """
         CREATE TABLE IF NOT EXISTS refresh_sessions (
             id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -113,6 +115,19 @@ def _migrate() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_backup_jobs_queue "
             "ON backup_jobs (status, created_at)"
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_accounts_owner ON accounts (owner_user_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_projects_owner ON projects (owner_user_id)")
+        # La instalación anterior compartía recursos entre sus usuarios. Para
+        # conservarla sin exponerla a las cuentas nuevas, se asigna al usuario
+        # más antiguo; si aún no hay cuenta, el primer registro reclamará huérfanos.
+        conn.execute(
+            "UPDATE accounts SET owner_user_id = (SELECT MIN(id) FROM web_users) "
+            "WHERE owner_user_id IS NULL AND EXISTS (SELECT 1 FROM web_users)"
+        )
+        conn.execute(
+            "UPDATE projects SET owner_user_id = (SELECT MIN(id) FROM web_users) "
+            "WHERE owner_user_id IS NULL AND EXISTS (SELECT 1 FROM web_users)"
         )
         _ensure_default_group(conn)
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")

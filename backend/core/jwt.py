@@ -1,7 +1,7 @@
-"""Tokens JWT (HS256) con la stdlib, para la API del frontend.
+"""Tokens JWT (HS256) con la stdlib, para la API móvil.
 
 Se usa un token sin estado en el header `Authorization: Bearer <token>`:
-evita cookies/CSRF entre servicios (backend y frontend separados). La clave
+evita dependencias de bibliotecas JWT externas. La clave
 de firma es `SESSION_SECRET` del entorno.
 """
 

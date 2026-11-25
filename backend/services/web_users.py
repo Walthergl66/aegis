@@ -15,7 +15,7 @@ LOCKOUT_MINUTES = 15
 MIN_PASSWORD_LENGTH = 12
 
 # Fallos de login por (usuario, IP). El bloqueo es por IP de origen para que un
-# tercero no pueda dejar fuera del panel al dueño de la cuenta desde otra
+# tercero no pueda dejar fuera de la cuenta a su dueño desde otra
 # dirección (DoS por lockout). Vive en memoria: reiniciar el proceso lo limpia,
 # lo cual es aceptable para un control anti fuerza bruta.
 _login_failures: dict[tuple[str, str], list[float]] = {}

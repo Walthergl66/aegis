@@ -1,4 +1,4 @@
-"""Persistent queue for backups requested from the web app."""
+"""Persistent queue for backups requested from the mobile app."""
 
 from __future__ import annotations
 
@@ -27,12 +27,14 @@ def create(project_id: int, requested_by: int, idempotency_key: str) -> dict:
     return dict(row)
 
 
-def get(job_id: str) -> dict | None:
-    row = db.fetch_one(
-        """SELECT j.*, p.slug FROM backup_jobs j
-           JOIN projects p ON p.id = j.project_id WHERE j.id = ?""",
-        (job_id,),
-    )
+def get(job_id: str, owner_user_id: int | None = None) -> dict | None:
+    sql = """SELECT j.*, p.slug FROM backup_jobs j
+             JOIN projects p ON p.id = j.project_id WHERE j.id = ?"""
+    params: tuple = (job_id,)
+    if owner_user_id is not None:
+        sql += " AND p.owner_user_id = ?"
+        params += (owner_user_id,)
+    row = db.fetch_one(sql, params)
     return dict(row) if row else None
 
 

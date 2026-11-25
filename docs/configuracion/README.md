@@ -11,7 +11,7 @@ La plantilla es `backend/.env.example`; `backend/core/config.py` define defaults
 | `BACKUP_ENCRYPTION_KEY` | — | Fernet para archivos, obligatorio y distinta. |
 | `SESSION_SECRET` | — | Secreto de firma JWT, obligatorio. |
 | `WEB_ADMIN_USERNAME` | `admin` | Usuario bootstrap del primer admin. |
-| `WEB_ADMIN_PASSWORD` | vacío | Contraseña inicial; si falta o no alcanza política, se genera provisional. Solo bootstrap. |
+| `WEB_ADMIN_PASSWORD` | vacío | Bootstrap opcional. Si se deja vacía, el primer usuario se registra desde la app. |
 | `DB_PATH` | local `backend/data/backups.db`; Docker `/data/backups.db` | Archivo SQLite. |
 | `BACKUP_DIR` | local `backend/data/backups`; Docker `/data/backups` | Raíz de copias de proyecto. |
 | `BACKUP_KEEP_COUNT` | `10` | Retención local por proyecto. |
@@ -37,7 +37,6 @@ La plantilla es `backend/.env.example`; `backend/core/config.py` define defaults
 | `OFFSITE_KEEP_COUNT` | `30` | Retención remota por proyecto. |
 | `WEB_HOST` | `0.0.0.0` | Host de escucha de Uvicorn. |
 | `WEB_PORT` | `8080` | Puerto API. |
-| `CORS_ALLOW_ORIGINS` | localhost y 127.0.0.1:8080 | Orígenes separados por coma. |
 | `FORWARDED_ALLOW_IPS` | redes privadas/loopback | Proxies confiables de Uvicorn. |
 | `WEB_DOCS_ENABLED` | `false` | Swagger, ReDoc y OpenAPI. |
 | `PBKDF2_ITERATIONS` | `600000` | Iteraciones de hash de contraseña. |
@@ -52,7 +51,7 @@ Los defaults locales y Docker de `DB_PATH`/`BACKUP_DIR` difieren: en Docker Comp
 
 ## Cambios de configuración sensibles
 
-Las claves no son intercambiables ni se pueden rotar sin recifrado planificado. Cambiar `SESSION_SECRET` invalida sesiones activas. `WEB_ADMIN_*` solo se usa cuando no hay usuarios web; luego cambia usuarios desde el panel. Mantén nginx `proxy_read_timeout` por encima del timeout del backup.
+Las claves no son intercambiables ni se pueden rotar sin recifrado planificado. Cambiar `SESSION_SECRET` invalida sesiones activas. `WEB_ADMIN_*` permite crear una cuenta inicial; si no se configura contraseña, el registro se hace desde la app móvil.
 
 ## App móvil
 

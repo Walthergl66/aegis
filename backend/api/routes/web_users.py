@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api/web-users", tags=["web users"])
 
 @router.get("")
 async def list_web_users(admin: dict = Depends(require_admin)):
-    """Listado de usuarios del panel: solo admin."""
+    """Listado de cuentas de acceso a la app: solo admin."""
     return web_users_srv.list_web_users()
 
 

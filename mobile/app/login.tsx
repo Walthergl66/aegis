@@ -51,6 +51,9 @@ export default function LoginScreen() {
           <Pressable disabled={loading || !username || !password} onPress={submit} style={({ pressed }) => [styles.button, (loading || !username || !password) && styles.disabled, pressed && styles.pressed]}>
             {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Continuar</Text>}
           </Pressable>
+          <Pressable accessibilityRole="button" onPress={() => router.push('/register')} style={styles.registerLink}>
+            <Text style={styles.registerText}>¿Primera vez? Crea tu cuenta</Text>
+          </Pressable>
         </View>
         <Text style={styles.footer}>Conexión segura con tu servidor privado</Text>
       </KeyboardAvoidingView>
@@ -75,5 +78,7 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.48 },
   pressed: { opacity: 0.8 },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  registerLink: { minHeight: 48, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+  registerText: { color: '#1d4ed8', fontSize: 14, fontWeight: '700' },
   footer: { color: '#94a3b8', fontSize: 12, textAlign: 'center', marginTop: 30 },
 });

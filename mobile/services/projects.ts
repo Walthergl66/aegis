@@ -95,7 +95,7 @@ export async function importSupabaseProjects(request: SessionRequest, payload: {
     '/import/create',
     {
       method: 'POST',
-      body: JSON.stringify({ ...payload, client_type: 'native' }),
+      body: JSON.stringify(payload),
     },
   );
 }

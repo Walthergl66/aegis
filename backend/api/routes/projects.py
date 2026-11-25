@@ -22,7 +22,7 @@ router = APIRouter(prefix="/api/projects", tags=["projects"])
 
 @router.post("/{project_id}/backup-jobs", status_code=202)
 async def enqueue_backup(project_id: int, request: Request, admin: dict = Depends(require_admin)):
-    project = projects_srv.get_project(project_id)
+    project = projects_srv.get_project(project_id, owner_user_id=admin["id"])
     if project is None or not project["activo"]:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado.")
     key = request.headers.get("Idempotency-Key", "").strip()
@@ -47,18 +47,24 @@ async def list_projects(
     if estado in ("eliminados", "todos") and user.get("rol") != "admin":
         raise HTTPException(status_code=403, detail="Solo los administradores pueden ver proyectos desactivados.")
     if estado == "eliminados":
-        projects = [p for p in projects_srv.list_projects(only_active=False, provider=provider) if not p["activo"]]
+        projects = [p for p in projects_srv.list_projects(
+            only_active=False, provider=provider, owner_user_id=user["id"]
+        ) if not p["activo"]]
     elif estado == "todos":
-        projects = projects_srv.list_projects(only_active=False, provider=provider)
+        projects = projects_srv.list_projects(
+            only_active=False, provider=provider, owner_user_id=user["id"]
+        )
     else:
-        projects = projects_srv.list_projects(only_active=True, provider=provider)
+        projects = projects_srv.list_projects(
+            only_active=True, provider=provider, owner_user_id=user["id"]
+        )
     return projects
 
 
 @router.get("/active")
 async def active_projects(user: dict = Depends(get_current_user)):
     """Proyectos activos, útil para selects y permisos."""
-    return projects_srv.list_projects(only_active=True)
+    return projects_srv.list_projects(only_active=True, owner_user_id=user["id"])
 
 
 @router.post("/test-connection")
@@ -98,6 +104,7 @@ async def create_project(request: Request, admin: dict = Depends(require_admin))
             schedule=data.get("schedule") or None,
             provider=data.get("provider") or None,
             backup_options=data.get("backup_options"),
+            owner_user_id=admin["id"],
         )
     except projects_srv.ProjectError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -109,7 +116,7 @@ async def create_project(request: Request, admin: dict = Depends(require_admin))
 
 @router.get("/{project_id}")
 async def get_project(project_id: int, user: dict = Depends(get_current_user)):
-    project = projects_srv.get_project(project_id)
+    project = projects_srv.get_project(project_id, owner_user_id=user["id"])
     if project is None:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado.")
     # Los proyectos desactivados solo los ve un admin (coherente con el listado).
@@ -138,6 +145,7 @@ async def update_project(project_id: int, request: Request, admin: dict = Depend
             schedule=data.get("schedule"),
             provider=data.get("provider") or None,
             backup_options=data.get("backup_options") if "backup_options" in data else None,
+            owner_user_id=admin["id"],
         )
     except projects_srv.ProjectError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -149,10 +157,10 @@ async def update_project(project_id: int, request: Request, admin: dict = Depend
 
 @router.delete("/{project_id}")
 async def delete_project(project_id: int, admin: dict = Depends(require_admin)):
-    if projects_srv.get_project(project_id) is None:
+    if projects_srv.get_project(project_id, owner_user_id=admin["id"]) is None:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado.")
     try:
-        projects_srv.delete_project(project_id)
+        projects_srv.delete_project(project_id, owner_user_id=admin["id"])
     except projects_srv.ProjectError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     scheduler_jobs.resync()
@@ -169,7 +177,9 @@ async def restore_project(project_id: int, request: Request, admin: dict = Depen
     except Exception:
         pass
     try:
-        projects_srv.restore_project(project_id, slug=data.get("slug") or None)
+        projects_srv.restore_project(
+            project_id, slug=data.get("slug") or None, owner_user_id=admin["id"]
+        )
     except projects_srv.ProjectError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     scheduler_jobs.resync()
@@ -180,7 +190,7 @@ async def restore_project(project_id: int, request: Request, admin: dict = Depen
 
 @router.get("/{project_id}/history")
 async def project_history(project_id: int, user: dict = Depends(get_current_user)):
-    project = projects_srv.get_project(project_id)
+    project = projects_srv.get_project(project_id, owner_user_id=user["id"])
     if project is None:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado.")
     if not project["activo"] and user.get("rol") != "admin":

@@ -9,11 +9,10 @@ Guía de referencia del repositorio. Describe la implementación observada en el
 | [App móvil nativa](movil/README.md) | Scaffold Expo, configuración, sesión, proyectos, backups, importación Supabase y administración de usuarios. |
 | [Plan de implementación móvil](implementacion/implementacion.md) | Fases, estado actual, criterios de salida y trabajo pendiente para completar la experiencia móvil. |
 | [Arquitectura](arquitectura/README.md) | Componentes, flujo de arranque, límites entre capas y responsabilidades por módulo. |
-| [API y permisos](api/README.md) | Rutas REST, autenticación, roles y contrato con el frontend. |
+| [API y permisos](api/README.md) | Rutas REST, autenticación, roles y contrato con la app móvil. |
 | [Datos y persistencia](datos/README.md) | Esquema SQLite, relaciones, migraciones y cifrado de campos. |
 | [Backups y planificación](backups/README.md) | Flujo de backup, verificación, retención, scheduler y copia remota. |
 | [Bot y notificaciones](bot/README.md) | Comandos, registro, autorización y mensajes operativos. |
-| [Frontend legado](frontend/README.md) | Inventario del panel web transitorio y su retiro tras completar paridad móvil. |
 | [Seguridad](seguridad/README.md) | Controles, claves, sesiones, límites y datos sensibles. |
 | [Configuración](configuracion/README.md) | Variables, valores por defecto y efectos de rotación. |
 | [Instalación y operación](operacion/README.md) | Entorno local, Docker, tareas frecuentes e incidentes. |
@@ -31,9 +30,6 @@ backend/backup/              ejecución, scheduler, retención y destino S3
 backend/bot/                 polling y handlers de Telegram
 backend/notify/              envío a Telegram y resumen de salud
 backend/db/schema.sql        esquema inicial SQLite
-frontend/src/features/       pantallas React por dominio
-frontend/src/services/       clientes HTTP por dominio
-frontend/src/components/     layout y componentes compartidos
 mobile/                      app nativa Expo/React Native Android e iOS
 docs/                        documentación funcional y operativa
 data/                         volumen de runtime, fuera de Git

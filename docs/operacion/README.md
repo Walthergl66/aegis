@@ -16,9 +16,9 @@ docker compose up -d --build
 docker compose ps
 ```
 
-Durante la migración, el panel se publica en `http://localhost:8080` enlazado a loopback; el estado final eliminará la SPA y conservará el acceso privado a la API para la app móvil. `./data` persiste DB y backups aunque se eliminen contenedores. `docker compose down` no elimina esa carpeta. El backend se espera healthy antes de iniciar frontend mientras este siga desplegado.
+Solo se despliega el backend/API, enlazado a `127.0.0.1:8080`. Configura `EXPO_PUBLIC_API_URL` en la app móvil con el endpoint privado HTTPS (por ejemplo, Tailscale Serve). `./data` persiste DB y backups aunque se eliminen contenedores. `docker compose down` no elimina esa carpeta.
 
-Al primer acceso usa `WEB_ADMIN_USERNAME`/`WEB_ADMIN_PASSWORD`. La contraseña inicial debe satisfacer la política de servicio; si no, se crea una temporal protegida junto a los datos. Cámbiala después del ingreso. Importar desde el panel valida PAT y proyectos, crea la cuenta/proyectos y permite dar de alta usuario Telegram y permisos. `/id` devuelve el chat ID. También se puede administrar desde CRUD.
+Al instalar por primera vez, crea la cuenta desde la app móvil. Si se configuró `WEB_ADMIN_PASSWORD`, esa cuenta inicial se creó durante el arranque. Las cuentas y sus conexiones se sincronizan al iniciar sesión en otro dispositivo.
 
 ## Desarrollo
 
@@ -31,19 +31,12 @@ cp .env.example .env
 python main.py
 ```
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Vite sirve en `:5173` y proxy `/api` a `localhost:8000`; el backend por defecto usa 8080. Para desarrollo ajusta `WEB_PORT=8000` o cambia el proxy en `frontend/vite.config.js`.
+La app móvil se desarrolla desde `mobile/` con `npm install` y `npm run start`; configura `.env.local` desde `.env.example`.
 
 ## Comandos habituales
 
 ```bash
 docker compose logs -f backend
-docker compose logs -f frontend
 docker compose restart backend
 docker compose down
 docker compose up -d --build
@@ -51,7 +44,7 @@ docker compose up -d --build
 
 ## Importación y uso
 
-1. Para PostgreSQL directo, crea un proyecto con una URI y valida la conexión; se crea/usa el grupo **Conexiones directas**. Para Supabase, importa con un PAT.
+1. Desde la app móvil, crea un proyecto PostgreSQL con una URI o importa proyectos Supabase con un PAT.
 2. Registra el usuario Telegram que ejecutará comandos y asigna `can_backup`/`can_monitor` si no es admin.
 3. Ejecuta `/proyectos`, `/test <slug>`, `/status <slug>`, `/backup <slug>` o `/historial <slug>`.
 4. Opcional: define cron de cinco campos para cada proyecto activo.

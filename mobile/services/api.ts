@@ -58,7 +58,12 @@ export const api = {
   login: (username: string, password: string, code: string) =>
     request<SessionTokens>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ username, password, code, client_type: 'native' }),
+      body: JSON.stringify({ username, password, code }),
+    }),
+  register: (username: string, password: string) =>
+    request<SessionTokens>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
     }),
   refresh: (refreshToken: string) =>
     request<SessionTokens>('/auth/refresh', {

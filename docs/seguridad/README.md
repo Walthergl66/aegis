@@ -4,12 +4,11 @@ Este documento resume controles presentes en la aplicación; el perímetro de re
 
 ## Identidad y permisos
 
-- Contraseñas web: PBKDF2-SHA256 con salt y umbral mínimo aplicado por los servicios de usuario; bloqueo tras fallos de login.
-- Sesión web: access JWT HS256 y refresh en cookie HttpOnly rotativa; SQLite conserva su hash y la revocación del access token.
-- Sesión nativa: la app usa `client_type: native`; guarda access y refresh tokens con `expo-secure-store`, envía el refresh token en el cuerpo al renovar/cerrar sesión y recibe el token rotado. El servidor conserva también la cookie web para que siga funcionando el panel.
-- TOTP opcional por usuario del panel; se exige código al login si está activado.
+- Contraseñas de acceso a la app: PBKDF2-SHA256 con salt y umbral mínimo aplicado por los servicios de usuario; bloqueo tras fallos de login.
+- Sesión móvil: guarda access y refresh tokens con `expo-secure-store`, envía el refresh token en el cuerpo al renovar/cerrar sesión y recibe el token rotado.
+- TOTP opcional por cuenta de acceso; se exige código al login si está activado.
 - Separación de roles web y Telegram; permisos por proyecto para usuarios Telegram no admin.
-- Login limitado por slowapi y nginx; mini-WAF en API y límites nginx reducen ráfagas/escaneo.
+- Login limitado por slowapi; el mini-WAF de la API reduce ráfagas y escaneo.
 
 ## Secretos y backups
 
@@ -24,9 +23,9 @@ Este documento resume controles presentes en la aplicación; el perímetro de re
 
 ## Contenedores y proxy
 
-Compose ejecuta ambos contenedores con UID 1000, capacidades eliminadas, `no-new-privileges`, filesystem de solo lectura y `/tmp` temporal. Solo el frontend publica puerto y lo enlaza a `127.0.0.1:8080`; el backend es interno. nginx agrega cabeceras de seguridad, CSP, límites de solicitudes, proxy con timeout de 660s y resolución de IP mediante proxies confiables.
+Compose ejecuta el backend con UID 1000, capacidades eliminadas, `no-new-privileges`, filesystem de solo lectura y `/tmp` temporal. La API se enlaza únicamente a `127.0.0.1:8080`; el acceso remoto debe pasar por Tailscale Serve.
 
-No publiques directamente el backend ni confíes en `X-Forwarded-*` de proxies arbitrarios. Mantén nginx con timeout superior a `BACKUP_TIMEOUT_SECONDS`. El runbook Modelo A restringe acceso remoto a Tailscale.
+No publiques directamente el backend ni confíes en `X-Forwarded-*` de proxies arbitrarios. El runbook Modelo A restringe acceso remoto a Tailscale.
 
 ## Ciclo de vida de claves
 

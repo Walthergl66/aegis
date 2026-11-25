@@ -17,8 +17,10 @@ async def list_audit(
     user: dict = Depends(get_current_user),
 ):
     offset = (page - 1) * page_size
-    rows = audit_srv.list_audit(limit=page_size, offset=offset)
-    total = audit_srv.count_audit()
+    rows = audit_srv.list_audit(
+        limit=page_size, offset=offset, owner_user_id=user["id"]
+    )
+    total = audit_srv.count_audit_for_user(user["id"])
     return {
         "rows": [dict(r) for r in rows],
         "total": total,

@@ -13,6 +13,15 @@ def _make_user(db, uid=1, username="user1"):
     return {"id": created, "username": username, "rol": "admin"}
 
 
+def _login(client):
+    response = client.post("/api/auth/login", json={
+        "username": "user1", "password": "LargaSegura-2026",
+    })
+    assert response.status_code == 200
+    assert "set-cookie" not in response.headers
+    return response.json()["refresh_token"]
+
+
 def test_create_y_rotacion_en_bd(db):
     store = refresh_tokens.RefreshTokenStore()
     token = store.create(_make_user(db))
@@ -99,21 +108,20 @@ def test_purga_semanal_de_sesiones_expirables(db):
 
 
 def test_cambio_de_password_revoca_sesiones(db):
-    """Regresión: resetear la contraseña invalida todas las sesiones web."""
+    """Regresión: resetear la contraseña invalida las sesiones móviles."""
     from fastapi.testclient import TestClient
     from api.app import app
 
     uid = web_users.create_web_user("user1", "LargaSegura-2026", rol="viewer")
     with TestClient(app) as c:
-        assert c.post("/api/auth/login", json={
-            "username": "user1", "password": "LargaSegura-2026",
-        }).status_code == 200
-        assert c.post("/api/auth/refresh").status_code == 200
+        refresh_token = _login(c)
+        refreshed = c.post("/api/auth/refresh", json={"refresh_token": refresh_token})
+        assert refreshed.status_code == 200
+        refresh_token = refreshed.json()["refresh_token"]
 
         web_users.update_web_user(uid, password="OtraSegura-2027!!")
 
-        assert c.post("/api/auth/refresh").status_code == 401
-        assert c.post("/api/auth/refresh").status_code == 401
+        assert c.post("/api/auth/refresh", json={"refresh_token": refresh_token}).status_code == 401
 
 
 def test_sesion_vieja_sigue_valida_sin_cambio_de_password(db):
@@ -123,13 +131,12 @@ def test_sesion_vieja_sigue_valida_sin_cambio_de_password(db):
 
     uid = web_users.create_web_user("user1", "LargaSegura-2026", rol="viewer")
     with TestClient(app) as c:
-        assert c.post("/api/auth/login", json={
-            "username": "user1", "password": "LargaSegura-2026",
-        }).status_code == 200
+        refresh_token = _login(c)
 
         web_users.update_web_user(uid, rol="admin")
 
-        assert c.post("/api/auth/refresh").status_code == 200
+        refreshed = c.post("/api/auth/refresh", json={"refresh_token": refresh_token})
+        assert refreshed.status_code == 200
 
 
 def test_refresh_rechazado_si_usuario_desactivado(db):
@@ -138,16 +145,15 @@ def test_refresh_rechazado_si_usuario_desactivado(db):
 
     uid = web_users.create_web_user("user1", "LargaSegura-2026", rol="viewer")
     with TestClient(app) as c:
-        assert c.post("/api/auth/login", json={
-            "username": "user1", "password": "LargaSegura-2026",
-        }).status_code == 200
-        assert c.post("/api/auth/refresh").status_code == 200
+        refresh_token = _login(c)
+        refreshed = c.post("/api/auth/refresh", json={"refresh_token": refresh_token})
+        assert refreshed.status_code == 200
+        refresh_token = refreshed.json()["refresh_token"]
 
         web_users.update_web_user(uid, activo=False)
 
         # Desactivado: la sesión deja de renovarse (y se revoca).
-        assert c.post("/api/auth/refresh").status_code == 401
-        assert c.post("/api/auth/refresh").status_code == 401
+        assert c.post("/api/auth/refresh", json={"refresh_token": refresh_token}).status_code == 401
 
 
 def test_refresh_rechazado_si_usuario_eliminado(db):
@@ -156,32 +162,24 @@ def test_refresh_rechazado_si_usuario_eliminado(db):
 
     uid = web_users.create_web_user("user1", "LargaSegura-2026", rol="viewer")
     with TestClient(app) as c:
-        assert c.post("/api/auth/login", json={
-            "username": "user1", "password": "LargaSegura-2026",
-        }).status_code == 200
+        refresh_token = _login(c)
 
         web_users.delete_web_user(uid)
 
-        assert c.post("/api/auth/refresh").status_code == 401
+        assert c.post("/api/auth/refresh", json={"refresh_token": refresh_token}).status_code == 401
 
 
-def test_cookie_secure_segun_esquema(db):
-    """La cookie de sesión es Secure solo cuando llega por HTTPS (tras Tailscale)."""
+def test_sesion_movil_usa_json_sin_cookie(db):
+    """La app recibe refresh token en JSON sin crear cookies de navegador."""
     from fastapi.testclient import TestClient
     from api.app import app
     from services import web_users
 
     web_users.create_web_user("user1", "LargaSegura-2026", rol="admin")
-    body = {"username": "user1", "password": "LargaSegura-2026"}
-
-    with TestClient(app, base_url="http://testserver") as c:
-        resp = c.post("/api/auth/login", json=body)
+    with TestClient(app) as c:
+        resp = c.post("/api/auth/login", json={
+            "username": "user1", "password": "LargaSegura-2026",
+        })
         assert resp.status_code == 200
-        set_cookie = resp.headers.get("set-cookie", "")
-        assert "Secure" not in set_cookie
-        assert "HttpOnly" in set_cookie
-
-    with TestClient(app, base_url="https://testserver") as c:
-        resp = c.post("/api/auth/login", json=body)
-        assert resp.status_code == 200
-        assert "Secure" in resp.headers.get("set-cookie", "")
+        assert resp.json()["refresh_token"]
+        assert "set-cookie" not in resp.headers

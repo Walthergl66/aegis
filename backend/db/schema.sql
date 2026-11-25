@@ -16,6 +16,7 @@ DROP TABLE IF EXISTS accounts;
 -- ------------------------------------------------------------------
 CREATE TABLE accounts (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_user_id INTEGER REFERENCES web_users(id) ON DELETE SET NULL,
     nombre      TEXT NOT NULL,
     provider    TEXT NOT NULL DEFAULT 'supabase', -- supabase | postgres
     pat_encrypted TEXT NOT NULL,        -- Personal Access Token, cifrado (Fernet).
@@ -29,6 +30,7 @@ CREATE TABLE accounts (
 -- ------------------------------------------------------------------
 CREATE TABLE projects (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_user_id INTEGER REFERENCES web_users(id) ON DELETE SET NULL,
     slug          TEXT NOT NULL UNIQUE,            -- identificador corto, usado en los comandos del bot
     nombre        TEXT NOT NULL,
     provider      TEXT NOT NULL DEFAULT 'supabase', -- supabase | postgres
@@ -147,6 +149,9 @@ CREATE TABLE backup_jobs (
 
 CREATE INDEX IF NOT EXISTS idx_backup_jobs_queue
     ON backup_jobs (status, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_accounts_owner ON accounts (owner_user_id);
+CREATE INDEX IF NOT EXISTS idx_projects_owner ON projects (owner_user_id);
 
 CREATE INDEX IF NOT EXISTS idx_backup_history_project
     ON backup_history (project_id, fecha DESC);
