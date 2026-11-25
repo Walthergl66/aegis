@@ -23,7 +23,7 @@ La API es JSON bajo `/api/*`. Las rutas salvo salud y login requieren `Authoriza
 | `POST /api/import/fetch` | Admin | Recibe `pat` y devuelve proyectos disponibles y cantidad ya importada; usa el servicio existente de Supabase Management API. |
 | `POST /api/import/create` | Admin | Importa proyectos seleccionados con `pat`, `account_name`, `selected_projects`, `pooler_mode` (`session` o `transaction`), `db_password` opcional y `test_connection`. `client_type: "native"` omite la creación/requisito de usuario Telegram y registra `mobile_import_supabase`; el flujo web existente sigue pidiendo los datos Telegram. El PAT queda cifrado en la cuenta Supabase del servidor. |
 | `/api/users` | Admin | CRUD de usuarios Telegram y `POST /{id}/permissions`. |
-| `/api/web-users` | Admin | CRUD de usuarios del panel. |
+| `/api/web-users` | Admin | `GET`, `POST`, `GET/{id}`, `PUT/{id}` y `DELETE/{id}` para cuentas de acceso de la app (`admin`/`viewer`, tabla histórica `web_users`). El cliente nativo usa estas rutas para gestionarlas; contraseña mínima de 12 caracteres. Cambio de contraseña o desactivación revoca sesiones. No se permite que el admin actual cambie su rol, se desactive o se elimine; tampoco se puede quitar el último admin activo. |
 | `GET /api/backups` | Sesión | Historial paginado de backups; rutas devueltas relativas a BACKUP_DIR. |
 | `GET /api/backups/{backup_id}/download?format=dump|sql` | Admin | Descarga por streaming un artefacto cifrado asociado a un backup correcto. Solo acepta `dump` o `sql`. |
 | `POST /api/projects/{id}/backup-jobs` | Admin | Encola un backup y responde `202`; requiere `Idempotency-Key`. Repetir la clave del mismo usuario devuelve el trabajo existente. La app móvil conserva la clave hasta recibir aceptación. |
@@ -34,9 +34,9 @@ Los detalles de los cuerpos, respuestas y errores se definen en las funciones de
 
 ## Roles
 
-- **Web `admin`**: administra cuentas, proyectos, importaciones, usuarios Telegram y usuarios web.
-- **Web `viewer`**: consulta panel, proyectos, backups, auditoría y su seguridad personal. La autorización se aplica también en backend, no solo ocultando menús.
-- El rol web no equivale al rol Telegram. Son identidades separadas.
+- **`admin` de la app**: gestiona proyectos e importaciones y puede administrar cuentas de acceso con `/api/web-users`. El cliente final es móvil; `web_users` y `/api/web-users` conservan nombres históricos.
+- **`viewer`**: rol de solo lectura para proyectos, backups, auditoría y seguridad personal. La autorización se aplica en backend, no solo ocultando menús.
+- Las cuentas de acceso a la app y los usuarios de Telegram son identidades separadas. `/api/users` administra solo usuarios Telegram y permisos del bot.
 - Los usuarios de Telegram tienen rol `admin` o `usuario`; estos últimos tienen permisos por proyecto (`can_backup`, `can_monitor`). Un admin Telegram tiene acceso global.
 
 ## Sesiones
