@@ -2,7 +2,7 @@
 
 ## Backup de proyecto
 
-`backend/backup/runner.py` invoca `pg_dump --format=custom --compress=9` (`-Fc`) con `subprocess`, `shell=False` y timeout configurable. Antes de ejecutarlo exige el mínimo de espacio libre. Un lock por ID de proyecto serializa ejecuciones simultáneas de bot y scheduler.
+`backend/backup/runner.py` invoca `pg_dump --format=custom --compress=9` (`-Fc`) con `subprocess`, `shell=False` y timeout configurable. Antes de ejecutarlo exige el mínimo de espacio libre. Un lock por ID de proyecto serializa ejecuciones simultáneas de bot y scheduler. Para proyectos PostgreSQL directo se pueden aplicar `--no-owner` y `--no-privileges`; ambos están activados por defecto para ese proveedor y se pueden cambiar desde el formulario del proyecto. Proyectos Supabase no reciben esas opciones por defecto.
 
 El dump se valida con `pg_restore --list`; esto comprueba que el catálogo del archivo sea legible, pero no equivale a ensayar una restauración completa en otra base. Luego se intenta generar un `.sql` plano con `pg_restore`. El `.sql` es complementario: si la conversión falla, el dump custom puede completar. Los archivos se cifran con Fernet y se elimina el claro. En almacenamiento se esperan archivos `.dump.enc` y, cuando se genera, `.sql.enc`.
 
@@ -10,7 +10,9 @@ Cada resultado de proyecto se registra en `backup_history`; las acciones manuale
 
 ## Origen de la conexión
 
-Al importar, el sistema valida el PAT con la Management API de Supabase, lista proyectos y obtiene pooler config. Usa modo session (`:5432`) por defecto para `pg_dump`; se puede inyectar la contraseña de la BD. La connection string se cifra al guardarla. Si `project_ref` está vacío, el proyecto puede representar PostgreSQL genérico sin Management API, aunque sigue usando el motor de backup PostgreSQL.
+Para PostgreSQL directo se registra una URI `postgresql://` o `postgres://`, que se valida y prueba antes de guardarse. El proveedor analiza host/puerto/usuario/base y opciones libpq admitidas. La contraseña se entrega a `pg_dump` en `PGPASSWORD`, no como argumento del proceso; el resto de datos se pasa como argumentos separados. La connection string completa se cifra al guardarla.
+
+Para Supabase, el sistema valida el PAT con la Management API, lista proyectos y obtiene pooler config. Usa modo session (`:5432`) por defecto para `pg_dump`; si hace falta, se inyecta la contraseña de la BD. La connection string también se cifra. Los dos proveedores comparten el motor PostgreSQL de backup; solo Supabase ofrece importación y estado cloud.
 
 ## Ejecuciones
 
