@@ -1,16 +1,19 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "Backups PostgreSQL",
+    "slug": "backups-postgresql",
     "version": "1.0.0",
     "orientation": "portrait",
+    "platforms": ["ios", "android"],
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
+    "scheme": "backups-postgresql",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "bundleIdentifier": "com.backupspostgresql.mobile",
       "supportsTablet": true
     },
     "android": {
+      "package": "com.backupspostgresql.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -18,11 +21,6 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
-    },
-    "web": {
-      "bundler": "metro",
-      "output": "server",
-      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       "expo-router",
