@@ -6,6 +6,7 @@ Guía de referencia del repositorio. Describe la implementación observada en el
 
 | Tema | Contenido |
 |---|---|
+| [Implementación de la app móvil](implementacion/implementacion.md) | Plan por fases para operar PostgreSQL desde el móvil, incorporar Supabase como extensión y retirar Telegram. |
 | [Arquitectura](arquitectura/README.md) | Componentes, flujo de arranque, límites entre capas y responsabilidades por módulo. |
 | [API y permisos](api/README.md) | Rutas REST, autenticación, roles y contrato con el frontend. |
 | [Datos y persistencia](datos/README.md) | Esquema SQLite, relaciones, migraciones y cifrado de campos. |
