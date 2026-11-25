@@ -2,7 +2,7 @@
 
 **Objetivo de producto.** Una persona autorizada puede registrar una base PostgreSQL, probar la conexión, programar o iniciar una copia, cerrar la app y volver para consultar el resultado o recuperar el archivo. Una cuenta Supabase añade descubrimiento de proyectos por PAT y estado del servicio. El mismo motor PostgreSQL respalda ambos tipos de conexión.
 
-**Cliente móvil.** La aplicación móvil objetivo es nativa y multiplataforma, desarrollada con Expo y React Native bajo `mobile/`. El frontend PWA existente continúa como interfaz web administrativa, no como sustituto del cliente móvil. La app nativa usa la misma API REST y guarda tokens en el almacén seguro de Android/iOS. El estado y guía del scaffold están en [App móvil](../movil/README.md).
+**Cliente final.** El producto se usará únicamente desde la app nativa multiplataforma Expo/React Native bajo `mobile/`. No se mantendrá un panel web como interfaz de producto. El frontend actual y el bot son piezas transitorias: se conservan mientras se completa la paridad móvil, la migración de identidad y la entrega de alertas; después se retirarán. El cliente móvil usa la API REST y almacena tokens en el almacén seguro del sistema. Véase [App móvil](../movil/README.md).
 
 ## Estado actual del plan
 
@@ -12,9 +12,9 @@ El alcance móvil sigue incompleto: faltan una experiencia de cron más completa
 
 **Punto de partida.** FastAPI, el bot y APScheduler comparten un proceso. Ya existen sesiones con TOTP, proyectos, proveedores, prueba de conexión, historial, cifrado, rotación y copia S3. La ruta web de backups lista ejecuciones. El disparo manual, la entrega de archivos y varias alertas dependen del bot. El arranque exige `BOT_TOKEN`. Las rutas y tablas nuevas que aparecen más abajo son propuestas. Véanse la [arquitectura](../arquitectura/README.md), la [API](../api/README.md) y el [inventario del bot](../bot/README.md).
 
-## 1. Fijar el alcance y preparar una migración reversible
+## 1. Fijar el alcance móvil y preparar una migración reversible
 
-- **Decisión:** construir un cliente nativo Expo/React Native para Android e iOS. El frontend PWA sigue atendiendo el panel web. El cliente móvil comparte API y reglas de negocio con el servidor, con navegación y almacenamiento propios de cada plataforma.
+- **Decisión:** app nativa Expo/React Native para Android e iOS como único cliente final. No añadir funciones nuevas al panel web; usarlo solo para las operaciones que aún no estén portadas y retirarlo cuando se cumplan los criterios de salida.
 - **Alcance del piloto:** administrar conexiones PostgreSQL, probarlas, iniciar y consultar backups, ver historial y descargar archivos. Supabase queda como proveedor opcional. No retirar Telegram ni cambiar todavía el flujo de alertas.
 - Inventariar comandos, conversaciones, alertas, resumen diario, entrega de dumps y copia de SQLite del panel. Asociar cada flujo a una pantalla, permiso, destinatario y prueba de aceptación.
 - Identificar proyectos, cron, archivos cifrados y permisos existentes. Crear una copia recuperable de SQLite, resguardar por separado ambas claves Fernet y ensayar la migración sobre una copia. Conservar los identificadores para mantener el historial.
@@ -35,7 +35,7 @@ El alcance móvil sigue incompleto: faltan una experiencia de cron más completa
 
 - Reutilizar usuarios del panel, TOTP y sesiones revocables. Extender los permisos por proyecto a las identidades que operarán desde el móvil. Distinguir consulta, ejecución, descarga y administración. Conservar la semántica de solo lectura de `viewer`.
 - Preparar una correspondencia revisada por un administrador entre usuarios Telegram y cuentas del panel. Asignar permisos explícitos y conservar la identidad histórica de auditoría. Un nombre coincidente o el conocimiento de un chat ID no acredita titularidad.
-- Definir el ciclo de sesión por plataforma. En cliente nativo guardar el secreto de renovación en el almacén seguro del sistema. Para PWA revisar la exposición del access token actual en `localStorage`. Incluir cierre remoto por pérdida del dispositivo. Redactar URI, contraseña, PAT y tokens en logs, errores y telemetría.
+- Definir identidad y ciclo de sesión móvil con tokens revocables en SecureStore, cierre remoto por pérdida del dispositivo y migración de los usuarios existentes. Retirar luego cookies y lógica de sesión que solo existan para la interfaz web. Redactar URI, contraseña, PAT y tokens en logs, errores y telemetría.
 
 **Salida:** dos usuarios con proyectos distintos solo pueden consultar, ejecutar y descargar dentro de su alcance, incluso si invocan directamente la API. La revocación se aplica en el siguiente acceso.
 
@@ -91,10 +91,10 @@ Diseñar estados de carga, ausencia de datos, desconexión, expiración de sesi�
 
 **Salida:** restauración demostrada, regresiones críticas resueltas y piloto capaz de operar durante un ciclo completo de la programación utilizada.
 
-## 9. Retirar el bot y cerrar la transición
+## 9. Retirar el panel web y Telegram; cerrar la transición solo móvil
 
-1. Validar la matriz de paridad con los operadores. Confirmar que cada permiso fue migrado, que los administradores reciben alertas y que pueden recuperar tanto copias de proyectos como la del panel.
-2. Hacer opcional Telegram en configuración y arranque. Desactivar el polling en el piloto y observar copias programadas, entrega de eventos, descargas y arranques sin `BOT_TOKEN`. Durante esta ventana, permitir volver a activar el canal anterior.
-3. Tras aceptar el piloto, retirar handlers, envíos y dependencia de Telegram. Revisar el importador, las pantallas de usuarios, Docker, la plantilla de entorno y los runbooks. Conservar auditoría e historial según su política de retención y revocar el token del bot al cerrar la ventana de reversión.
+1. Completar en móvil usuarios, roles/permisos, cuentas, auditoría, seguridad personal y alertas. Validar la matriz de paridad con operadores; demostrar recuperación de copias y configuración sin usar el panel web.
+2. Publicar un piloto móvil. Migrar identidad y credenciales, detener el acceso de usuarios al panel web y retirar el contenedor/SPA. Sustituirlo por un gateway API mínimo o publicar el backend solo en loopback para Tailscale Serve; conservar límites de solicitudes, cabeceras de seguridad, HTTPS, IP de proxy confiable y timeout de descargas. Nunca publicar el backend directamente a Internet.
+3. Desactivar el polling Telegram y verificar arranque, backups programados, eventos push, descargas, restauraciones y administración sin `BOT_TOKEN`. Tras aceptar el piloto, retirar handlers, envíos, cookies/sesiones exclusivas del panel, dependencias de frontend, Docker y documentación de web. Conservar auditoría e historial; revocar el token del bot al cerrar la reversión.
 
-**Criterio final:** una instalación nueva y una actualizada arrancan sin Telegram. Ambas permiten administrar PostgreSQL, operar backups desde el móvil, recibir alertas y recuperar datos. La integración de Supabase se activa únicamente para los proyectos que la utilizan.
+**Criterio final:** la instalación nueva y la actualizada se operan desde Android/iOS. No distribuyen el panel web ni requieren Telegram. La app administra PostgreSQL, integra Supabase como capacidad adicional, recibe alertas y recupera datos; el backend queda expuesto únicamente mediante el acceso privado documentado.
