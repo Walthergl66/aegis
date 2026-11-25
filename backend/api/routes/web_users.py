@@ -45,6 +45,13 @@ async def get_web_user(user_id: int, admin: dict = Depends(require_admin)):
 @router.put("/{user_id}")
 async def update_web_user(user_id: int, request: Request, admin: dict = Depends(require_admin)):
     data = await request.json()
+    if user_id == admin["id"]:
+        requested_role = data.get("rol")
+        requested_active = as_bool(data.get("activo"), True)
+        if requested_role and requested_role != admin["rol"]:
+            raise HTTPException(status_code=400, detail="No puedes cambiar tu propio rol.")
+        if not requested_active:
+            raise HTTPException(status_code=400, detail="No puedes desactivar tu propia cuenta.")
     try:
         web_users_srv.update_web_user(
             user_id,
@@ -61,6 +68,8 @@ async def update_web_user(user_id: int, request: Request, admin: dict = Depends(
 
 @router.delete("/{user_id}")
 async def delete_web_user(user_id: int, admin: dict = Depends(require_admin)):
+    if user_id == admin["id"]:
+        raise HTTPException(status_code=400, detail="No puedes eliminar tu propia cuenta.")
     if web_users_srv.get_web_user_by_id(user_id) is None:
         raise HTTPException(status_code=404, detail="Usuario web no encontrado.")
     try:
