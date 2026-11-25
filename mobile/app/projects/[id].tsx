@@ -1,11 +1,11 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BackupHistoryItem, getProjectHistory, ProjectHistory } from '@/services/projects';
+import { archiveProject, BackupHistoryItem, getProjectHistory, ProjectHistory } from '@/services/projects';
 import { apiUrl } from '@/services/api';
 import { useSession } from '@/services/session';
 
@@ -85,7 +85,19 @@ export default function ProjectScreen() {
     }
   }, [id, request]);
 
-  useEffect(() => { void load(); }, [load]);
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
+
+  function confirmArchive() {
+    if (!data) return;
+    Alert.alert('Archivar proyecto', 'Se detendrán las copias programadas. El historial se conservará.', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Archivar', style: 'destructive', onPress: () => {
+        void archiveProject(request, Number(id)).then(() => router.replace('/(tabs)')).catch((error) => {
+          Alert.alert('No se pudo archivar', error instanceof Error ? error.message : 'Intenta de nuevo.');
+        });
+      } },
+    ]);
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -96,6 +108,10 @@ export default function ProjectScreen() {
             <Text style={styles.title}>{data.project.nombre}</Text>
             <Text style={styles.slug}>{data.project.slug}</Text>
             {!!data.project.connection_masked && <Text style={styles.connection}>Conexión: {data.project.connection_masked}</Text>}
+            {user?.rol === 'admin' && <View style={styles.projectActions}>
+              <Pressable onPress={() => router.push({ pathname: '/projects/[id]/edit', params: { id: String(data.project.id) } })} style={styles.editButton}><Text style={styles.editText}>Editar</Text></Pressable>
+              <Pressable onPress={confirmArchive} style={styles.archiveButton}><Text style={styles.archiveText}>Archivar</Text></Pressable>
+            </View>}
           </View>
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Historial de copias</Text>
@@ -118,6 +134,11 @@ const styles = StyleSheet.create({
   title: { color: '#fff', fontSize: 25, lineHeight: 31, fontWeight: '800', marginTop: 8 },
   slug: { color: '#cbd5e1', fontSize: 13, marginTop: 5 },
   connection: { color: '#94a3b8', fontSize: 12, marginTop: 16 },
+  projectActions: { flexDirection: 'row', marginTop: 18 },
+  editButton: { minHeight: 36, paddingHorizontal: 14, borderRadius: 10, backgroundColor: '#1d4ed8', alignItems: 'center', justifyContent: 'center', marginRight: 9 },
+  editText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  archiveButton: { minHeight: 36, paddingHorizontal: 14, borderRadius: 10, backgroundColor: '#334155', alignItems: 'center', justifyContent: 'center' },
+  archiveText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   section: { marginTop: 28 },
   sectionTitle: { color: '#0f172a', fontSize: 18, fontWeight: '800', marginBottom: 12 },
   historyRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 12, marginBottom: 8, backgroundColor: '#fff', borderRadius: 15, borderWidth: 1, borderColor: '#e2e8f0' },

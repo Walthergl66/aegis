@@ -7,6 +7,10 @@ export type Project = {
   provider: string;
   account_nombre?: string | null;
   connection_masked?: string | null;
+  account_id?: number | null;
+  project_ref?: string;
+  schedule?: string | null;
+  backup_options?: { no_owner?: boolean; no_privileges?: boolean };
   activo: boolean;
   ultimo_backup?: string | null;
   tamaño_archivo?: number | null;
@@ -38,11 +42,32 @@ export async function listProjects(request: SessionRequest) {
   return request<Project[]>('/projects?estado=activos');
 }
 
-export async function testPostgresConnection(request: SessionRequest, connection: string) {
+export async function testPostgresConnection(request: SessionRequest, connection: string, provider = 'postgres') {
   return request<{ ok: boolean; detalle: string; server_version?: string; latency_ms?: number }>(
     '/projects/test-connection',
-    { method: 'POST', body: JSON.stringify({ connection, provider: 'postgres' }) },
+    { method: 'POST', body: JSON.stringify({ connection, provider }) },
   );
+}
+
+export async function getProject(request: SessionRequest, projectId: number) {
+  return request<Project>('/projects/' + projectId);
+}
+
+export async function updateProject(request: SessionRequest, projectId: number, data: {
+  nombre: string;
+  provider: string;
+  account_id?: number | null;
+  project_ref?: string;
+  connection?: string;
+  schedule: string;
+  activo: boolean;
+  backup_options?: { no_owner: boolean; no_privileges: boolean };
+}) {
+  return request<{ ok: boolean }>('/projects/' + projectId, { method: 'PUT', body: JSON.stringify(data) });
+}
+
+export async function archiveProject(request: SessionRequest, projectId: number) {
+  return request<{ ok: boolean }>('/projects/' + projectId, { method: 'DELETE' });
 }
 
 export async function createPostgresProject(request: SessionRequest, data: {
