@@ -23,6 +23,8 @@ Para Supabase, el sistema valida el PAT con la Management API, lista proyectos y
 
 Un cron de proyecto puede expresarse, por ejemplo, como `30 3 * * *`. El parser valida el formato y los rangos al guardar. Los fallos programados alertan a admins.
 
+Las solicitudes manuales desde la API web se guardan en `backup_jobs` y las procesa un worker del backend, aunque el cliente cierre la aplicación. El alta requiere `Idempotency-Key` y solo `admin` puede iniciarla. La app consulta el trabajo por su ID. Los estados son `queued`, `running`, `completed`, `failed` e `interrupted`. Si el backend reinicia mientras un trabajo estaba en ejecución, este queda como `interrupted` para revisión y no se repite automáticamente. Las solicitudes en cola se conservan en SQLite. El resultado se enlaza con `backup_history` y `audit_log`; al completar bien se intenta sincronizar off-site.
+
 ## Copia off-site
 
 Si `OFFSITE_ENABLED=on`, `backup/offsite.py` sube los archivos `.enc` nuevos a un endpoint S3 compatible y aplica retención por carpeta/proyecto, conservando `OFFSITE_KEEP_COUNT` por proyecto. Se intenta sincronizar al arrancar y después de backups correctos. Es una sincronización best-effort: los errores se registran y notifican, y se pueden reintentar en la siguiente sincronización.
