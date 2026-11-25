@@ -18,17 +18,17 @@ La API es JSON bajo `/api/*`. Las rutas salvo salud y login requieren `Authoriza
 | `/api/projects` | Mixto | Listado/detalle/historial autenticado; alta, edición, baja y restauración admin. Incluye `GET /active`. |
 | `POST /api/projects/test-connection` | Admin | Prueba una URI antes de guardarla; JSON `connection` y `provider` opcional (`postgres` por defecto). Devuelve `ok`, detalle, host, base, versión y latencia. |
 | `POST /api/projects/{id}/restore` | Admin | Restaura proyecto archivado con el slug enviado. |
-| `GET /api/projects/{id}/history` | Sesión | Historial paginado del proyecto. |
+| `GET /api/projects/{id}/history` | Sesión | Proyecto, resumen y las 25 entradas recientes de su historial. |
 | `/api/import/fetch`, `/api/import/create` | Admin | Consulta Management API y registra proyectos seleccionados. |
 | `/api/users` | Admin | CRUD de usuarios Telegram y `POST /{id}/permissions`. |
 | `/api/web-users` | Admin | CRUD de usuarios del panel. |
 | `GET /api/backups` | Sesión | Historial paginado de backups; rutas devueltas relativas a BACKUP_DIR. |
 | `GET /api/backups/{backup_id}/download?format=dump|sql` | Admin | Descarga por streaming un artefacto cifrado asociado a un backup correcto. Solo acepta `dump` o `sql`. |
-| `POST /api/projects/{id}/backup-jobs` | Admin | Encola un backup y responde `202`; requiere `Idempotency-Key`. Repetir la clave del mismo usuario devuelve el trabajo existente. |
-| `GET /api/backups/jobs/{job_id}` | Sesión | Consulta estado persistente del trabajo en cola, ejecución, completado, fallo o interrupción. |
+| `POST /api/projects/{id}/backup-jobs` | Admin | Encola un backup y responde `202`; requiere `Idempotency-Key`. Repetir la clave del mismo usuario devuelve el trabajo existente. La app móvil conserva la clave hasta recibir aceptación. |
+| `GET /api/backups/jobs/{job_id}` | Sesión | Consulta estado persistente del trabajo (`queued`, `running`, `completed`, `failed`, `interrupted`). La app móvil conserva el ID y sondea mientras está activo. |
 | `GET /api/audit` | Sesión | Bitácora paginada. |
 
-Los detalles de los cuerpos, respuestas y errores se definen en las funciones de `backend/api/routes/`. La API de backups lista metadatos; no sirve archivos de backup para descarga.
+Los detalles de los cuerpos, respuestas y errores se definen en las funciones de `backend/api/routes/`. La API de backups lista metadatos; la descarga de un dump se realiza desde la ruta individual autenticada indicada arriba, que usa también el cliente móvil.
 
 ## Roles
 
@@ -40,5 +40,7 @@ Los detalles de los cuerpos, respuestas y errores se definen en las funciones de
 ## Sesiones
 
 Access JWT HS256 de corta duración viaja en Bearer. En web, el refresh token se administra en cookie HttpOnly; en nativo viaja en JSON y el cliente lo conserva en SecureStore. Ambos flujos rotan refresh tokens y en SQLite solo se conserva el hash. Cada request autenticado vuelve a consultar el usuario para reflejar desactivación y cambios de rol; la revocación del access token se guarda en SQLite y sobrevive reinicios. El bloqueo por intentos fallidos se aplica al login, no a sesiones ya autenticadas.
+
+El cliente nativo renueva y reintenta una solicitud protegida una vez al recibir 401. Si el refresh falla con 401, elimina la sesión local para requerir un nuevo login.
 
 Errores de validación/autorización se devuelven como JSON `detail`. El middleware de throttling puede responder HTTP 429. Un JSON malformado devuelve 400. La referencia interactiva es opcional y debe mantenerse apagada en producción salvo que se necesite.
