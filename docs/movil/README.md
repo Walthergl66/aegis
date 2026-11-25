@@ -13,12 +13,14 @@ La app ya cubre una primera ruta operativa:
 - Inicio consume `GET /api/projects?estado=activos` y muestra proyectos PostgreSQL/Supabase, proveedor y fecha del último backup correcto.
 - Un admin puede iniciar un backup desde la tarjeta del proyecto. La app conserva la clave `Idempotency-Key` mientras espera aceptación, guarda el ID del trabajo en SecureStore y consulta su estado periódicamente; si pierde conexión conserva el ID para retomar el polling.
 - Un admin puede abrir **Añadir PostgreSQL** desde Inicio y registrar una conexión directa: nombre y URI obligatorios, slug opcional (el servidor lo deriva del nombre si falta), cron opcional y opciones `no_owner`/`no_privileges`. La pantalla ofrece probar la URI antes de guardar; probarla no es requisito para habilitar el guardado.
+- Un admin también puede iniciar **Importar Supabase** desde Inicio: consulta proyectos disponibles con un PAT, selecciona cuáles importar, elige el pooler y puede indicar la contraseña de la base y pedir una prueba de conexión antes de crear los proyectos.
 - En el detalle, un admin puede editar nombre, reemplazar opcionalmente la URI (y probar la nueva), cambiar cron, estado activo y opciones de dump para PostgreSQL. También puede archivar el proyecto; el historial se conserva.
+- En Inicio, un admin puede alternar entre proyectos activos e inactivos y restaurarlos; la interfaz los etiqueta como **Archivados**. La lista se actualiza tras la operación.
 - El Inicio vuelve a cargar los proyectos al recuperar el foco, por ejemplo al regresar del formulario de edición.
 - El detalle del proyecto consume su historial y muestra las 25 entradas más recientes. Permite descargar un dump con la sesión vigente, guardarlo temporalmente en la caché y compartirlo con la hoja nativa; elimina el archivo temporal después.
 - Configuración Expo con plataformas Android e iOS y bundles de ambas plataformas verificados para este corte.
 
-La app todavía no importa proyectos Supabase desde Management API, ni permite restaurar un proyecto archivado desde el móvil. No incluye administración de usuarios/permisos ni push. La pantalla de alta solo crea conexiones directas PostgreSQL. El cron se edita como expresión de cinco campos, sin selector de zona horaria ni vista previa de próxima ejecución. La verificación de configuración y bundles no demuestra una prueba en dispositivos físicos ni constituye una build de distribución.
+La importación Supabase móvil reutiliza el flujo y los servicios de Supabase existentes en el backend; no agrega una implementación separada de Management API. En modo nativo no requiere ni crea un usuario Telegram. Quedan pendientes las pruebas en dispositivos físicos, y validar PAT vencidos/sin permisos, contraseña de base ausente o incorrecta, disponibilidad de Supabase y resultados parciales de importación. La app no incluye administración de usuarios/permisos ni push. El cron se edita como expresión de cinco campos, sin selector de zona horaria ni vista previa de próxima ejecución. La verificación de configuración y bundles no demuestra una prueba en dispositivos físicos ni constituye una build de distribución.
 
 ## Configuración y arranque local
 
@@ -51,12 +53,13 @@ Los scripts de plataforma inician el servidor de desarrollo y no producen un paq
 | `mobile/app/index.tsx` | Espera la restauración de sesión y redirige a login o al grupo autenticado. |
 | `mobile/app/login.tsx` | Formulario, envío de credenciales/TOTP y errores del login. |
 | `mobile/app/(tabs)/_layout.tsx` | Protege la navegación autenticada. |
-| `mobile/app/(tabs)/index.tsx` | Carga proyectos activos, refresca la lista y presenta tarjetas; ofrece el alta a admins. |
+| `mobile/app/(tabs)/index.tsx` | Carga/actualiza proyectos activos o archivados; ofrece alta e importación a admins. |
 | `mobile/app/projects/new.tsx` | Formulario admin para crear conexión PostgreSQL directa, probarla, asignar cron y elegir opciones de dump. |
+| `mobile/app/import/supabase.tsx` | Flujo admin para consultar proyectos Supabase, seleccionarlos y configurar la importación nativa. |
 | `mobile/app/projects/[id].tsx` | Detalle con proveedor, conexión enmascarada, historial, descarga temporal y acciones admin para editar o archivar. |
 | `mobile/app/projects/[id]/edit.tsx` | Formulario admin para editar nombre, conexión, cron, estado activo y opciones PostgreSQL. |
-| `mobile/components/ProjectCard.tsx` | Muestra último backup, inicia ejecución para admin, persiste clave/ID y sondea estado del job. |
-| `mobile/services/projects.ts` | Tipos y adaptadores para listado/alta de proyectos, prueba de conexión, backup jobs e historial. |
+| `mobile/components/ProjectCard.tsx` | Muestra último backup, inicia ejecución o restaura proyectos inactivos, y persiste/sondea backup jobs. |
+| `mobile/services/projects.ts` | Tipos y adaptadores para listado/alta/edición/restauración, importación Supabase, prueba de conexión, backup jobs e historial. |
 | `mobile/services/api.ts` | Cliente HTTP y adaptadores de sesión; renueva y reintenta una vez las solicitudes autenticadas. |
 | `mobile/services/session.tsx` | Contexto, restauración/rotación, cierre y datos de sesión/trabajo en SecureStore. |
 | `mobile/.env.example` | Plantilla de `EXPO_PUBLIC_API_URL`. |
@@ -77,8 +80,11 @@ El servidor sigue emitiendo/aceptando `sb_refresh_token` como cookie HttpOnly pa
 - El formulario de alta envía `POST /api/projects` como admin con `provider: "postgres"`, `nombre`, `connection`, `backup_options` y, opcionalmente, `slug` y `schedule`. El servidor valida la URI, deriva el slug si se omite, valida el cron de cinco campos y cifra la URI para almacenarla. La app no conserva la URI en SecureStore.
 - El botón **Probar conexión** usa `POST /api/projects/test-connection` con `provider: "postgres"`; enseña el resultado, versión y latencia. Es una acción independiente: se puede guardar aunque no se haya probado antes o la prueba haya fallado; el backend valida igualmente los datos del alta.
 - Las opciones `no_owner` y `no_privileges` comienzan activadas y se pueden cambiar. Un cron vacío representa ejecución manual; el ejemplo `30 3 * * *` tiene cinco campos (minuto, hora, día del mes, mes y día de semana).
+- Desde Inicio, solo admin puede abrir el importador Supabase. `POST /api/import/fetch` consulta proyectos con el PAT y separa los disponibles de los ya importados. Se pueden seleccionar varios, dar un nombre a la cuenta Supabase y, al importar, elegir pooler `session` (5432) o `transaction` (6543), ingresar opcionalmente la contraseña de la base y activar/desactivar la prueba de conexión (activada por defecto en el formulario).
+- El cliente envía `POST /api/import/create` con `client_type: "native"`. El PAT y la contraseña viven en el estado temporal del formulario y no se guardan en el almacenamiento móvil; el backend persiste cifrado el PAT en la cuenta Supabase y cifra la URI de conexión del proyecto. La contraseña se incorpora a la URI cuando se necesita y no se guarda como campo separado.
+- En modo nativo el backend no exige ni crea un usuario Telegram; registra la acción de auditoría `mobile_import_supabase`. La importación usa el servicio existente para consultar Management API, obtener el pooler y, si se pidió, probar la conexión. Los proyectos ya activos se excluyen como duplicados; los errores por proyecto se devuelven junto con el conteo importado.
 - Desde el detalle, la edición usa `PUT /api/projects/{id}`; deja la URI en blanco para conservar la conexión cifrada actual. Si se escribe una nueva, se puede probar con `POST /api/projects/test-connection` antes de guardar. El formulario también actualiza cron/estado, y solo muestra opciones `no_owner`/`no_privileges` para PostgreSQL.
-- **Archivar** usa `DELETE /api/projects/{id}` como eliminación lógica: desactiva el proyecto, libera su slug y conserva historial/auditoría. No hay restauración móvil; la reactivación desde el editor de proyectos accesibles no sustituye la operación explícita de restauración.
+- **Archivar** usa `DELETE /api/projects/{id}` como eliminación lógica: desactiva el proyecto, libera su slug y conserva historial/auditoría. Desde el filtro **Archivados**, admin puede restaurar con `POST /api/projects/{id}/restore`; el cliente no envía slug y el backend reutiliza el slug archivado si sigue disponible. Ese filtro de API incluye cualquier proyecto inactivo, también los que se desactivaron desde el editor.
 - Solo el rol web `admin` ve el botón para encolar una copia; el endpoint requiere ese mismo rol. El detalle/historial queda disponible desde las tarjetas.
 - La app envía `POST /api/projects/{id}/backup-jobs` con `Idempotency-Key`. Conserva la clave en SecureStore hasta recibir aceptación para que un reintento de red use la misma operación.
 - Al aceptar el servidor, la app guarda el `job_id` por proyecto en SecureStore y consulta `GET /api/backups/jobs/{job_id}` cada 2.5 segundos. Los estados terminales son `completed`, `failed` e `interrupted`; los estados activos son `queued` y `running`. Si el sondeo falla por desconexión, el ID se mantiene y se vuelve a consultar.
@@ -87,4 +93,4 @@ El servidor sigue emitiendo/aceptando `sb_refresh_token` como cookie HttpOnly pa
 
 ## Próxima fase
 
-El orden del trabajo, los criterios de salida y los flujos de producto pendientes están en el [plan de implementación móvil](../implementacion/implementacion.md). Lo siguiente es completar importación/restauración de proyectos, dar una experiencia más completa a cron y permisos/administración, añadir push y validar los flujos en dispositivos físicos.
+El orden del trabajo, los criterios de salida y los flujos de producto pendientes están en el [plan de implementación móvil](../implementacion/implementacion.md). Lo siguiente es completar la cobertura y validación física de Supabase, dar una experiencia más completa a cron y permisos/administración, añadir push y validar los flujos en dispositivos físicos.
