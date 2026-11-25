@@ -8,6 +8,8 @@ El dump se valida con `pg_restore --list`; esto comprueba que el catálogo del a
 
 Cada resultado de proyecto se registra en `backup_history`; las acciones manuales y programadas dejan también `audit_log`. La rotación local conserva hasta `BACKUP_KEEP_COUNT` copias por proyecto. Los detalles de errores PostgreSQL se traducen y redactan antes de mostrarse/notificarse.
 
+Administradores descargan artefactos con `GET /api/backups/{backup_id}/download?format=dump` o `format=sql`. El endpoint acepta solo filas exitosas, resuelve la ruta dentro de `BACKUP_DIR` y transmite el contenido descifrado por bloques sin crear otro archivo claro en disco. Cada descarga queda auditada con usuario, proyecto y formato. La API de historial expone rutas relativas para no revelar la ruta absoluta del servidor.
+
 ## Origen de la conexión
 
 Para PostgreSQL directo se registra una URI `postgresql://` o `postgres://`, que se valida y prueba antes de guardarse. El proveedor analiza host/puerto/usuario/base y opciones libpq admitidas. La contraseña se entrega a `pg_dump` en `PGPASSWORD`, no como argumento del proceso; el resto de datos se pasa como argumentos separados. La connection string completa se cifra al guardarla.
