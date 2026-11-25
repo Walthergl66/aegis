@@ -42,6 +42,7 @@ export default function HomeScreen() {
           <View style={styles.topActions}>
             {user?.rol === 'admin' && <Pressable accessibilityRole="button" onPress={() => router.push('/projects/new')} style={styles.addButton}><Text style={styles.addText}>+</Text></Pressable>}
             {user?.rol === 'admin' && <Pressable accessibilityRole="button" accessibilityLabel="Importar proyectos Supabase" onPress={() => router.push('/import/supabase')} style={styles.importButton}><Text style={styles.importText}>S</Text></Pressable>}
+            {user?.rol === 'admin' && <Pressable accessibilityRole="button" accessibilityLabel="Administración" onPress={() => router.push('/admin')} style={styles.adminButton}><Text style={styles.adminText}>⚙</Text></Pressable>}
             <Pressable accessibilityRole="button" accessibilityLabel="Cerrar sesión" onPress={() => void signOut()} style={styles.avatar}>
               <Text style={styles.avatarText}>{user?.username.slice(0, 1).toUpperCase()}</Text>
             </Pressable>
@@ -87,6 +88,8 @@ const styles = StyleSheet.create({
   addText: { color: '#fff', fontSize: 25, lineHeight: 28, fontWeight: '500' },
   importButton: { width: 40, height: 40, borderRadius: 14, backgroundColor: '#dbeafe', alignItems: 'center', justifyContent: 'center' },
   importText: { color: '#1d4ed8', fontSize: 16, fontWeight: '900' },
+  adminButton: { width: 40, height: 40, borderRadius: 14, backgroundColor: '#e2e8f0', alignItems: 'center', justifyContent: 'center' },
+  adminText: { color: '#334155', fontSize: 18, fontWeight: '800' },
   avatarText: { color: '#1d4ed8', fontSize: 17, fontWeight: '800' },
   hero: { backgroundColor: '#0f172a', borderRadius: 22, padding: 22, minHeight: 180, justifyContent: 'center' },
   statusDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#4ade80', marginBottom: 13 },
