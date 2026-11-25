@@ -1,6 +1,6 @@
-# Frontend web y PWA
+# Frontend web legado
 
-Este documento cubre el cliente web administrativo: una SPA React 18 con React Router, compilada por Vite y servida por nginx. `frontend/src/main.jsx` monta proveedores globales; `App.jsx` declara rutas; `features/` agrupa pantallas y `services/` define llamadas a la API. La PWA se puede instalar desde el navegador, pero no es la app móvil objetivo. El cliente móvil nativo vive en [`mobile/`](../movil/README.md).
+Este documento registra el panel web administrativo legado: una SPA React 18 con React Router, compilada por Vite y servida por nginx. `frontend/src/main.jsx` monta proveedores globales; `App.jsx` declara rutas; `features/` agrupa pantallas y `services/` define llamadas a la API. El producto final será solo móvil nativo; esta interfaz se conserva temporalmente para operaciones aún no portadas. No implementar nuevas funciones aquí. Su criterio de retiro está en el [plan móvil](../implementacion/implementacion.md).
 
 ## Rutas de pantalla
 
@@ -37,4 +37,4 @@ En desarrollo Vite escucha el puerto 5173 y su proxy `/api` apunta a `localhost:
 
 Iconos PWA: `frontend/public/icons/`; generador: `frontend/scripts/generate-icons.mjs` (ejecutar desde `frontend/`).
 
-La instalación PWA usa el sitio web y sus políticas de navegador. Para login nativo, almacenamiento seguro, Expo y configuración de URL de API consulta la [guía móvil](../movil/README.md).
+La PWA y sus políticas de navegador describen únicamente el estado actual de transición. La app final usa Expo, SecureStore y la URL HTTPS de API documentada en la [guía móvil](../movil/README.md). Este documento se eliminará cuando se retire el cliente web.
