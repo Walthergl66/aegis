@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
@@ -14,6 +15,7 @@ from services import backup_history as history_srv
 from services import backup_jobs as jobs_srv
 from services import projects as projects_srv
 from services import providers
+from core.config import settings
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -184,8 +186,17 @@ async def project_history(project_id: int, user: dict = Depends(get_current_user
     if not project["activo"] and user.get("rol") != "admin":
         raise HTTPException(status_code=404, detail="Proyecto no encontrado.")
     stats = projects_srv.project_extra_status(project_id)
+    rows = history_srv.recent(project_id, limit=25)
+    backup_root = Path(settings().backup_dir)
+    for row in rows:
+        if row["ruta_archivo"]:
+            path = Path(row["ruta_archivo"])
+            try:
+                row["ruta_archivo"] = path.resolve().relative_to(backup_root.resolve()).as_posix()
+            except (OSError, ValueError):
+                row["ruta_archivo"] = path.name
     return {
         "project": project,
-        "rows": history_srv.recent(project_id, limit=25),
+        "rows": rows,
         "stats": stats,
     }

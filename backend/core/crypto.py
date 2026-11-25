@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import struct
+from collections.abc import Iterator
 
 from cryptography.fernet import Fernet, InvalidToken
 
@@ -87,6 +88,37 @@ def decrypt_file_bytes(token_path: Path) -> bytes:
             offset += size
         raise InvalidToken
     except (InvalidToken, ValueError) as exc:
+        raise ValueError(
+            "No se pudo descifrar el backup. ¿La clave BACKUP_ENCRYPTION_KEY "
+            "ha cambiado?"
+        ) from exc
+
+
+def iter_decrypted_file(token_path: Path) -> Iterator[bytes]:
+    """Descifra archivos por bloques para entregarlos sin crear otro claro en disco."""
+    cipher = _backup_fernet()
+    try:
+        with token_path.open("rb") as source:
+            magic = source.read(len(_FILE_MAGIC))
+            if magic != _FILE_MAGIC:
+                token = magic + source.read()
+                yield cipher.decrypt(token)
+                return
+
+            while True:
+                size_bytes = source.read(4)
+                if len(size_bytes) != 4:
+                    raise InvalidToken
+                size = struct.unpack(">I", size_bytes)[0]
+                if size == 0:
+                    if source.read(1):
+                        raise InvalidToken
+                    return
+                token = source.read(size)
+                if len(token) != size:
+                    raise InvalidToken
+                yield cipher.decrypt(token)
+    except (InvalidToken, ValueError, OSError) as exc:
         raise ValueError(
             "No se pudo descifrar el backup. ¿La clave BACKUP_ENCRYPTION_KEY "
             "ha cambiado?"

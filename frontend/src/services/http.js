@@ -91,9 +91,46 @@ async function request(path, options = {}) {
   return data
 }
 
+async function download(path, options = {}, retried = false) {
+  const headers = { ...(options.headers || {}) }
+  const token = getToken()
+  if (token) headers.Authorization = `Bearer ${token}`
+  const res = await fetch(path, { ...options, headers, credentials: 'include' })
+
+  if (res.status === 401 && !retried) {
+    try {
+      await refreshAccessToken()
+      return download(path, options, true)
+    } catch {
+      await redirectToLogin()
+      throw new ApiError('Sesión expirada', 401)
+    }
+  }
+  if (res.status === 401) {
+    await redirectToLogin()
+    throw new ApiError('Sesión expirada', 401)
+  }
+  if (!res.ok) {
+    let data = null
+    try { data = await res.json() } catch { data = null }
+    const detail = data?.detail || `Error HTTP ${res.status}`
+    throw new ApiError(typeof detail === 'string' ? detail : JSON.stringify(detail), res.status, data)
+  }
+
+  const disposition = res.headers.get('Content-Disposition') || ''
+  const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1]
+  const plainName = disposition.match(/filename="?([^";]+)"?/i)?.[1]
+  let filename = plainName || 'backup.dump'
+  if (encodedName) {
+    try { filename = decodeURIComponent(encodedName) } catch { filename = 'backup.dump' }
+  }
+  return { blob: await res.blob(), filename }
+}
+
 export const api = {
   get: (path, options = {}) => request(path, options),
   post: (path, body, options = {}) => request(path, { ...options, method: 'POST', body: JSON.stringify(body ?? {}) }),
   put: (path, body, options = {}) => request(path, { ...options, method: 'PUT', body: JSON.stringify(body ?? {}) }),
   del: (path, options = {}) => request(path, { ...options, method: 'DELETE' }),
+  download,
 }
