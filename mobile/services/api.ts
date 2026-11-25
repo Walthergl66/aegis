@@ -15,6 +15,11 @@ export type SessionTokens = {
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
 
+export function apiUrl(path: string) {
+  if (!API_URL) throw new ApiError('Configura EXPO_PUBLIC_API_URL en mobile/.env.local.', 0);
+  return API_URL + path;
+}
+
 export class ApiError extends Error {
   constructor(message: string, public status: number, public totpRequired = false) {
     super(message);
@@ -22,13 +27,11 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit, accessToken?: string): Promise<T> {
-  if (!API_URL) {
-    throw new ApiError('Configura EXPO_PUBLIC_API_URL en mobile/.env.local.', 0);
-  }
+  const url = apiUrl(path);
 
   let response: Response;
   try {
-    response = await fetch(`${API_URL}${path}`, {
+    response = await fetch(url, {
       ...init,
       headers: {
         'Content-Type': 'application/json',

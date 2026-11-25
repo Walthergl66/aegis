@@ -14,6 +14,7 @@ type SessionContextValue = {
   signIn: (tokens: SessionTokens) => Promise<void>;
   signOut: () => Promise<void>;
   request: <T,>(path: string, init?: RequestInit) => Promise<T>;
+  renewAccessToken: () => Promise<string>;
 };
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -92,7 +93,26 @@ export function SessionProvider({ children }: PropsWithChildren) {
     }
   }, [accessToken, clearStoredSession, persist]);
 
-  const value = useMemo(() => ({ ready, user, accessToken, signIn, signOut, request }), [ready, user, accessToken, signIn, signOut, request]);
+  const renewAccessToken = useCallback(async () => {
+    const refreshToken = await SecureStore.getItemAsync(REFRESH_KEY);
+    if (!refreshToken) throw new Error('La sesión expiró. Inicia sesión nuevamente.');
+    try {
+      const tokens = await api.refresh(refreshToken);
+      await persist(tokens);
+      setAccessToken(tokens.access_token);
+      setUser(tokens.user);
+      return tokens.access_token;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        await clearStoredSession();
+        setAccessToken(null);
+        setUser(null);
+      }
+      throw error;
+    }
+  }, [clearStoredSession, persist]);
+
+  const value = useMemo(() => ({ ready, user, accessToken, signIn, signOut, request, renewAccessToken }), [ready, user, accessToken, signIn, signOut, request, renewAccessToken]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 

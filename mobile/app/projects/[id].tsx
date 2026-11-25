@@ -1,9 +1,12 @@
 import { useLocalSearchParams } from 'expo-router';
+import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BackupHistoryItem, getProjectHistory, ProjectHistory } from '@/services/projects';
+import { apiUrl } from '@/services/api';
 import { useSession } from '@/services/session';
 
 function formatDate(value: string) {
@@ -11,8 +14,41 @@ function formatDate(value: string) {
   return Number.isNaN(date.valueOf()) ? value : date.toLocaleString();
 }
 
-function HistoryRow({ item }: { item: BackupHistoryItem }) {
+function HistoryRow({ item, projectSlug, canDownload, renewAccessToken }: {
+  item: BackupHistoryItem;
+  projectSlug: string;
+  canDownload: boolean;
+  renewAccessToken: () => Promise<string>;
+}) {
+  const [downloading, setDownloading] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
   const success = item.resultado === 'ok';
+  async function download() {
+    setDownloading(true);
+    setProgress(0);
+    let file: File | undefined;
+    try {
+      const accessToken = await renewAccessToken();
+      const name = projectSlug + '-backup-' + item.id + '.dump';
+      file = await File.downloadFileAsync(
+        apiUrl('/backups/' + item.id + '/download?format=dump'),
+        new File(Paths.cache, name),
+        {
+          headers: { Authorization: 'Bearer ' + accessToken },
+          idempotent: true,
+          onProgress: ({ bytesWritten, totalBytes }) => setProgress(totalBytes > 0 ? Math.floor(bytesWritten / totalBytes * 100) : null),
+        },
+      );
+      if (!await Sharing.isAvailableAsync()) throw new Error('No hay una opción para compartir archivos en este dispositivo.');
+      await Sharing.shareAsync(file.uri, { mimeType: 'application/octet-stream', dialogTitle: 'Guardar copia de seguridad' });
+    } catch (error) {
+      Alert.alert('No se pudo entregar la copia', error instanceof Error ? error.message : 'Intenta de nuevo.');
+    } finally {
+      file?.delete();
+      setDownloading(false);
+      setProgress(null);
+    }
+  }
   return (
     <View style={styles.historyRow}>
       <View style={[styles.result, success ? styles.success : styles.failure]}>
@@ -22,14 +58,16 @@ function HistoryRow({ item }: { item: BackupHistoryItem }) {
         <Text style={styles.historyDate}>{formatDate(item.fecha)}</Text>
         <Text style={styles.historyDetail}>{item.detalle || (success ? 'Copia disponible' : 'La ejecución no se completó')}</Text>
       </View>
-      <Text style={styles.size}>{item.tamaño_archivo ? (item.tamaño_archivo / 1024 / 1024).toFixed(1) + ' MB' : ''}</Text>
+      {canDownload && success && <Pressable disabled={downloading} onPress={() => void download()} style={styles.downloadButton}>
+        {downloading ? <Text style={styles.downloadingText}>{progress === null ? '…' : progress + '%'}</Text> : <Text style={styles.downloadText}>Descargar</Text>}
+      </Pressable>}
     </View>
   );
 }
 
 export default function ProjectScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { request } = useSession();
+  const { request, renewAccessToken, user } = useSession();
   const [data, setData] = useState<ProjectHistory | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -62,7 +100,7 @@ export default function ProjectScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Historial de copias</Text>
             {!data.rows.length ? <View style={styles.empty}><Text style={styles.emptyTitle}>Aún no hay copias</Text><Text style={styles.emptyText}>Las ejecuciones de este proyecto aparecerán aquí.</Text></View> :
-              data.rows.map((item) => <HistoryRow item={item} key={item.id} />)}
+              data.rows.map((item) => <HistoryRow item={item} projectSlug={data.project.slug} canDownload={user?.rol === 'admin'} renewAccessToken={renewAccessToken} key={item.id} />)}
           </View>
         </>}
         <Pressable style={styles.refreshButton} onPress={() => void load(true)}><Text style={styles.refreshText}>Actualizar historial</Text></Pressable>
@@ -92,7 +130,9 @@ const styles = StyleSheet.create({
   historyInfo: { flex: 1, marginLeft: 11 },
   historyDate: { color: '#0f172a', fontSize: 13, fontWeight: '700' },
   historyDetail: { color: '#64748b', fontSize: 12, marginTop: 4 },
-  size: { color: '#64748b', fontSize: 11, marginLeft: 5 },
+  downloadButton: { minHeight: 32, minWidth: 72, borderRadius: 9, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8, marginLeft: 8 },
+  downloadText: { color: '#1d4ed8', fontSize: 11, fontWeight: '800' },
+  downloadingText: { color: '#1d4ed8', fontSize: 11, fontWeight: '800' },
   empty: { backgroundColor: '#fff', borderRadius: 16, padding: 18, borderWidth: 1, borderColor: '#e2e8f0' },
   emptyTitle: { color: '#0f172a', fontWeight: '800' },
   emptyText: { color: '#64748b', lineHeight: 20, marginTop: 6, fontSize: 13 },
