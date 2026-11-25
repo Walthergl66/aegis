@@ -6,9 +6,9 @@
 
 ## Estado actual del plan
 
-La base de la **Fase 1** está implementada: scaffold Expo/React Native, configuración Android/iOS, navegación protegida, login con usuario/contraseña y paso TOTP, sesión nativa con tokens en SecureStore y contrato de refresh/logout nativo. La configuración y los bundles de Android e iOS fueron verificados en este corte.
+La base nativa de la **Fase 1** está implementada y avanzó a un primer recorrido de operación: scaffold Expo/React Native, configuración Android/iOS, navegación protegida, login con usuario/contraseña y TOTP, SecureStore y contrato nativo de sesión; Inicio lista proyectos y último backup, admin puede encolar una copia idempotente y la app sondea el job; el detalle muestra el historial reciente y permite descargar/compartir dumps mediante caché temporal. Una solicitud protegida con 401 provoca un refresh y un reintento; si el refresh devuelve 401, la sesión local se borra. La configuración y los bundles Android/iOS fueron verificados en este corte.
 
-La app aún es un scaffold de autenticación: Inicio muestra un espacio de proyectos pendiente. No hay todavía pantallas móviles para proyectos, ejecución/seguimiento de backups, historial, descarga, administración ni notificaciones push. La verificación de bundles no equivale a validar instalación y operación en dispositivos físicos ni a preparar builds de distribución. Por ello, los criterios de salida completos de la Fase 1 y el piloto siguen pendientes; el resto de fases conserva el alcance descrito más abajo.
+El alcance móvil sigue incompleto: faltan alta/edición y prueba de conexión, configuración de cron, administración y push. La verificación de bundles no equivale a validar instalación y operación en dispositivos físicos ni a preparar builds de distribución. Por ello, los criterios de salida completos de la Fase 1 y el piloto siguen pendientes; el resto de fases conserva el alcance descrito más abajo.
 
 **Punto de partida.** FastAPI, el bot y APScheduler comparten un proceso. Ya existen sesiones con TOTP, proyectos, proveedores, prueba de conexión, historial, cifrado, rotación y copia S3. La ruta web de backups lista ejecuciones. El disparo manual, la entrega de archivos y varias alertas dependen del bot. El arranque exige `BOT_TOKEN`. Las rutas y tablas nuevas que aparecen más abajo son propuestas. Véanse la [arquitectura](../arquitectura/README.md), la [API](../api/README.md) y el [inventario del bot](../bot/README.md).
 
@@ -52,14 +52,16 @@ La app aún es un scaffold de autenticación: Inicio muestra un espacio de proye
 
 ## 5. Entregar la experiencia móvil de PostgreSQL
 
-| Pantalla | Flujo que debe completar |
-|---|---|
-| Acceso | Entrar, introducir TOTP, renovar sesión y salir. |
-| Inicio | Identificar la última copia correcta, proyectos atrasados y operaciones que requieren atención. |
-| Proyectos | Crear o editar una conexión directa, probarla, ajustar opciones, consultar estado y archivar o reactivar el proyecto. |
-| Detalle de proyecto | Ejecutar **Respaldar ahora**, seguir el trabajo y volver a él desde el historial. Editar cron mostrando UTC, hora local y próxima ejecución. |
-| Copias | Consultar resultado, tamaño, fecha y disponibilidad. Descargar el archivo que corresponda y mostrar el destino de la descarga. |
-| Administración | Gestionar cuentas, usuarios, permisos, dispositivos, seguridad personal y auditoría. |
+| Pantalla | Estado actual | Pendiente |
+|---|---|---|
+| Acceso | Implementado: login, TOTP, renovación nativa y cierre de sesión. | Validación física y recuperación de sesión tras suspensión en Android/iOS. |
+| Inicio | Implementado: lista activos, proveedor, último backup correcto y refresco manual. | Indicadores de proyectos atrasados y atención requerida. |
+| Proyectos | Implementado: navegar a detalle e historial; admin puede encolar backup con idempotencia y seguirlo. | Crear/editar conexiones, probarlas, opciones, estado/cron y archivar/reactivar. |
+| Detalle de proyecto | Implementado: historial de 25 entradas, refresco manual y descarga/compartición temporal del dump. | Ejecutar/seguir backup desde el detalle y editar cron con UTC, hora local y próxima ejecución. |
+| Copias | Muestra fechas/resultados/tamaños en cards e historial; permite compartir temporalmente un dump descargado. | Mejorar indicación de disponibilidad y destino de descarga. |
+| Administración | Pendiente. | Cuentas, usuarios, permisos, dispositivos, seguridad personal y auditoría. |
+
+El cliente reutiliza `POST /api/projects/{id}/backup-jobs` y `GET /api/backups/jobs/{job_id}`. Conserva `Idempotency-Key` hasta aceptar la solicitud y el `job_id` en SecureStore para retomar polling; el endpoint de alta solo se presenta a admins. La integración del historial consume las 25 filas recientes de `GET /api/projects/{id}/history`.
 
 Diseñar estados de carga, ausencia de datos, desconexión, expiración de sesión y operación en curso. Al reconectar, consultar el trabajo por su identificador antes de ofrecer un reintento. Revisar lector de pantalla, tamaño de texto, contraste y manejo de archivos grandes en el dispositivo piloto.
 
