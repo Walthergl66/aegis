@@ -6,7 +6,7 @@ Guía de referencia del repositorio. Describe la implementación observada en el
 
 | Tema | Contenido |
 |---|---|
-| [App móvil nativa](movil/README.md) | Scaffold Expo, configuración, sesión y estado funcional de Android/iOS. |
+| [App móvil nativa](movil/README.md) | Scaffold Expo, configuración, sesión, proyectos, backups, restauración e importación Supabase nativa. |
 | [Plan de implementación móvil](implementacion/implementacion.md) | Fases, estado actual, criterios de salida y trabajo pendiente para completar la experiencia móvil. |
 | [Arquitectura](arquitectura/README.md) | Componentes, flujo de arranque, límites entre capas y responsabilidades por módulo. |
 | [API y permisos](api/README.md) | Rutas REST, autenticación, roles y contrato con el frontend. |
