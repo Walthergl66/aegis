@@ -2,18 +2,20 @@
 
 **Objetivo de producto.** Una persona autorizada puede registrar una base PostgreSQL, probar la conexión, programar o iniciar una copia, cerrar la app y volver para consultar el resultado o recuperar el archivo. Una cuenta Supabase añade descubrimiento de proyectos por PAT y estado del servicio. El mismo motor PostgreSQL respalda ambos tipos de conexión.
 
+**Cliente móvil.** La aplicación móvil será nativa y multiplataforma, desarrollada con Expo y React Native bajo `mobile/`. El frontend PWA existente continuará como interfaz web administrativa. La app nativa usará la misma API REST y guardará tokens en el almacén seguro de Android/iOS.
+
 **Punto de partida.** FastAPI, el bot y APScheduler comparten un proceso. Ya existen sesiones con TOTP, proyectos, proveedores, prueba de conexión, historial, cifrado, rotación y copia S3. La ruta web de backups lista ejecuciones. El disparo manual, la entrega de archivos y varias alertas dependen del bot. El arranque exige `BOT_TOKEN`. Las rutas y tablas nuevas que aparecen más abajo son propuestas. Véanse la [arquitectura](../arquitectura/README.md), la [API](../api/README.md) y el [inventario del bot](../bot/README.md).
 
 ## 1. Fijar el alcance y preparar una migración reversible
 
-- **Decisión para la primera entrega:** ampliar la PWA que ya existe y usarla como cliente móvil en Android e iOS. Evita mantener dos clientes mientras se valida el flujo. La decisión es reversible: si notificaciones push, almacenamiento seguro de refresh o transferencia de archivos no alcanzan los criterios en dispositivos reales, evaluar un cliente nativo compartido antes de ampliar el alcance.
+- **Decisión:** construir un cliente nativo Expo/React Native para Android e iOS. El frontend PWA sigue atendiendo el panel web. El cliente móvil comparte API y reglas de negocio con el servidor, con navegación y almacenamiento propios de cada plataforma.
 - **Alcance del piloto:** administrar conexiones PostgreSQL, probarlas, iniciar y consultar backups, ver historial y descargar archivos. Supabase queda como proveedor opcional. No retirar Telegram ni cambiar todavía el flujo de alertas.
 - Inventariar comandos, conversaciones, alertas, resumen diario, entrega de dumps y copia de SQLite del panel. Asociar cada flujo a una pantalla, permiso, destinatario y prueba de aceptación.
 - Identificar proyectos, cron, archivos cifrados y permisos existentes. Crear una copia recuperable de SQLite, resguardar por separado ambas claves Fernet y ensayar la migración sobre una copia. Conservar los identificadores para mantener el historial.
-- Mantener el acceso privado por HTTPS a través de Tailscale durante el piloto. Validar en al menos un dispositivo Android y uno iOS: instalación de PWA, login/TOTP, reconexión tras suspensión y descarga de un archivo representativo.
+- Mantener el acceso privado por HTTPS a través de Tailscale durante el piloto. Validar en al menos un dispositivo Android y uno iOS: build de desarrollo, login/TOTP, almacenamiento de sesión, reconexión tras suspensión y descarga de un archivo representativo.
 - Registrar los usuarios del piloto y sus permisos por proyecto. Confirmar la restauración de SQLite y de un dump en una base aislada antes de habilitar operaciones reales desde el teléfono.
 
-**Criterio de salida:** matriz de paridad aprobada, PWA instalada y recorrida en Android e iOS, recuperación del estado inicial ensayada y límites de distribución documentados. Si push o descarga no son fiables en alguno de los dispositivos, abrir la evaluación de cliente nativo antes de la fase 5.
+**Criterio de salida:** matriz de paridad aprobada, app nativa ejecutada en Android e iOS, recuperación del estado inicial ensayada y distribución de builds documentada.
 
 ## 2. Consolidar PostgreSQL como núcleo
 
