@@ -20,6 +20,7 @@ descifrarlos con la clave desde `core.crypto`.
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 import subprocess
 import threading
@@ -31,7 +32,8 @@ from pathlib import Path
 from core import crypto as crypto_mod
 from core import sanitize
 from core.config import settings
-from services import supabase_api as api_srv
+from services import providers
+from services.pg_errors import friendly_db_error
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +97,68 @@ def _disk_has_enough_space(directory: Path) -> tuple[bool, str]:
     return True, f"{free} MiB libres (mínimo {required} MiB)."
 
 
+_ALLOWED_DUMP_FLAGS = ("no_owner", "no_privileges")
+_FLAG_TO_ARG = {
+    "no_owner": "--no-owner",
+    "no_privileges": "--no-privileges",
+}
+
+
+def _normalize_dump_flags(options) -> dict:
+    """Normaliza las opciones de pg_dump a un dict seguro."""
+    if not isinstance(options, dict):
+        return {}
+    normalized: dict[str, bool] = {}
+    for key in _ALLOWED_DUMP_FLAGS:
+        if key in options and options[key] is not None:
+            normalized[key] = bool(options[key])
+    return normalized
+
+
+def _dump_command(connection: str, dest: Path, options) -> tuple[list[str], dict]:
+    """Construye el comando de pg_dump sin exponer la contraseña en argv.
+
+    Las credenciales viajan por entorno (libpq) y los datos de conexión se
+    pasan como argumentos separados. Si la cadena no es una URI válida se
+    conserva el comportamiento antiguo (`--dbname <cadena>`) por
+    compatibilidad con proyectos creados antes de esta versión.
+    """
+    flags = _normalize_dump_flags(options)
+    args = [
+        _pg_dump_binary(),
+        "--format=custom",   # -Fc
+        "--compress=9",
+        "--file", str(dest),
+    ]
+    env = os.environ.copy()
+    try:
+        data = providers.postgres.parse_dsn(connection)
+    except ValueError:
+        args += ["--dbname", connection]
+    else:
+        args += ["--host", str(data["host"]), "--port", str(data["port"])]
+        if data["user"]:
+            args += ["--username", str(data["user"])]
+        if data["dbname"]:
+            args += ["--dbname", str(data["dbname"])]
+        # El timeout de conexión no debe ser el del volcado completo (600 s
+        # por defecto): 30 s basta para distinguir un servidor caído.
+        env.update(
+            providers.postgres.psql_env(
+                connection, min(settings().backup_timeout_seconds, 30)
+            )
+        )
+
+    for key in _ALLOWED_DUMP_FLAGS:
+        if flags.get(key):
+            args.append(_FLAG_TO_ARG[key])
+    if flags:
+        active = [k for k, v in flags.items() if v]
+        if active:
+            logger.debug("pg_dump flags aplicados: %s", ", ".join(active))
+    return args, env
+
+
 def run_backup(project: dict) -> BackupResult:
     """Ejecuta un pg_dump -Fc de un proyecto, serializado por proyecto.
 
@@ -127,13 +191,7 @@ def _run_backup(project: dict) -> BackupResult:
         logger.error("Backup '%s' abortado: %s", slug, space_detail)
         return BackupResult(ok=False, detalle=space_detail, duracion_seg=time.monotonic() - start)
 
-    args = [
-        _pg_dump_binary(),
-        "--format=custom",   # -Fc
-        "--compress=9",
-        "--dbname", conn_str,
-        "--file", str(dest),
-    ]
+    args, env = _dump_command(conn_str, dest, project.get("backup_options"))
 
     logger.info("Iniciando backup del proyecto '%s'...", slug)
     try:
@@ -146,6 +204,7 @@ def _run_backup(project: dict) -> BackupResult:
             timeout=settings().backup_timeout_seconds,
             shell=False,
             check=False,
+            env=env,
         )
     except FileNotFoundError:
         elapsed = time.monotonic() - start
@@ -172,7 +231,7 @@ def _run_backup(project: dict) -> BackupResult:
     if proc.returncode != 0:
         # pg_dump puede dejar un archivo parcial en claro: se elimina.
         dest.unlink(missing_ok=True)
-        friendly = api_srv.friendly_db_error(detail or "pg_dump terminó con error.")
+        friendly = friendly_db_error(detail or "pg_dump terminó con error.")
         logger.error("Backup '%s' falló (exit %s): %s", slug, proc.returncode, detail)
         return BackupResult(
             ok=False,
@@ -258,8 +317,9 @@ def verify_dump(dump_path: Path) -> tuple[bool, str]:
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        logger.warning("Verificación de restauración omitida para %s: %s", dump_path.name, exc)
-        return True, "verificación omitida (pg_restore no disponible)"
+        # Un backup que no pudo verificarse no debe comunicarse como válido.
+        logger.warning("Verificación de restauración falló para %s: %s", dump_path.name, exc)
+        return False, f"no se pudo ejecutar pg_restore --list: {exc}"
 
     if proc.returncode != 0:
         tail = sanitize.redact_secrets("\n".join((proc.stderr or "").splitlines()[-5:]))

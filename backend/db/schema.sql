@@ -17,7 +17,9 @@ DROP TABLE IF EXISTS accounts;
 CREATE TABLE accounts (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     nombre      TEXT NOT NULL,
-    pat_encrypted TEXT NOT NULL,        -- Personal Access Token, cifrado (Fernet)
+    provider    TEXT NOT NULL DEFAULT 'supabase', -- supabase | postgres
+    pat_encrypted TEXT NOT NULL,        -- Personal Access Token, cifrado (Fernet).
+                                        -- En proveedores sin PAT se guarda cifrado vacío.
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
     activo      INTEGER NOT NULL DEFAULT 1
 );
@@ -29,9 +31,11 @@ CREATE TABLE projects (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     slug          TEXT NOT NULL UNIQUE,            -- identificador corto, usado en los comandos del bot
     nombre        TEXT NOT NULL,
+    provider      TEXT NOT NULL DEFAULT 'supabase', -- supabase | postgres
     account_id    INTEGER NOT NULL REFERENCES accounts(id),
     connection_encrypted TEXT NOT NULL,            -- cadena de conexión a PostgreSQL (pooler), cifrada
-    project_ref   TEXT NOT NULL DEFAULT '',    -- referencia para la Management API de Supabase; '' = BD PostgreSQL genérica (sin Management API)
+    project_ref   TEXT NOT NULL DEFAULT '',        -- referencia para la Management API de Supabase; '' = BD PostgreSQL genérica (sin Management API)
+    backup_options TEXT,                           -- JSON con flags opcionales de pg_dump
     created_at    TEXT NOT NULL DEFAULT (datetime('now')),
     activo        INTEGER NOT NULL DEFAULT 1,
     schedule      TEXT,                               -- cron 5 campos (min hora dia mes dow); NULL/'' = solo manual
@@ -121,6 +125,12 @@ CREATE TABLE refresh_sessions (
     expires_at REAL NOT NULL                       -- epoch seconds
 );
 
+-- Revocaciones de access tokens sobreviven reinicios del backend.
+CREATE TABLE access_token_revocations (
+    jti TEXT PRIMARY KEY,
+    expires_at INTEGER NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_backup_history_project
     ON backup_history (project_id, fecha DESC);
 
@@ -138,3 +148,5 @@ CREATE INDEX IF NOT EXISTS idx_refresh_sessions_user
 
 CREATE INDEX IF NOT EXISTS idx_refresh_sessions_expiry
     ON refresh_sessions (expires_at);
+CREATE INDEX IF NOT EXISTS idx_access_token_revocations_expiry
+    ON access_token_revocations (expires_at);

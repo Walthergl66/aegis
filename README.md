@@ -1,12 +1,18 @@
-# Supabase Backups
+# Bot de Backups y Monitoreo de PostgreSQL
 
-Panel web progresivo y bot de Telegram para administrar proyectos PostgreSQL, ejecutar y programar backups, revisar su estado y conservar una bitácora. El sistema integra FastAPI, React/Vite, SQLite, `pg_dump`/`pg_restore` y APScheduler en un despliegue Docker de dos contenedores; API, bot y trabajos programados comparten un único proceso backend.
+Panel web progresivo y bot de Telegram para administrar bases PostgreSQL y ejecutar backups bajo demanda o programados. Se puede conectar cualquier PostgreSQL accesible por URI; Supabase es opcional y añade importación por PAT y consulta del estado cloud. El motor de copias siempre usa `pg_dump`.
+
+El sistema integra FastAPI, React/Vite, SQLite, `pg_dump`/`pg_restore` y APScheduler en un despliegue Docker de dos contenedores. API, bot y trabajos programados comparten un único proceso backend.
 
 ## Empezar
 
 1. Copia `backend/.env.example` a `backend/.env` y completa `BOT_TOKEN`, `ENCRYPTION_KEY`, `BACKUP_ENCRYPTION_KEY` y `SESSION_SECRET`.
 2. Ejecuta `docker compose up -d --build`.
-3. Abre `http://localhost:8080`, inicia sesión con el admin inicial y configura cuentas, proyectos y usuarios. Si no se definió una contraseña inicial válida, el backend genera una provisional y la guarda fuera de los logs junto a la base.
+3. Abre `http://localhost:8080` e inicia sesión con el admin inicial. Agrega PostgreSQL desde **Proyectos → Nuevo proyecto** o, para Supabase, importa los proyectos con un PAT. Si no se definió una contraseña inicial válida, el backend genera una provisional y la guarda fuera de los logs junto a la base.
+
+Los proyectos PostgreSQL directos permiten probar la conexión antes de guardarla y configurar `--no-owner`/`--no-privileges` para facilitar restauraciones en servidores con otros usuarios. Los proyectos de Supabase se importan desde **Importar proyectos**.
+
+El bot incluye `/test <slug>`, además de `/proyectos`, `/backup <slug>`, `/status <slug>` y `/historial <slug>`.
 
 La guía completa de puesta en marcha local y operación está en [Instalación y operación](docs/operacion/README.md). Para el despliegue privado por Tailscale consulta el [runbook Modelo A](docs/despliegue/README.md).
 
