@@ -3,23 +3,26 @@
 ## Vista general
 
 ```text
-Navegador (React/PWA web) ──► nginx (127.0.0.1:8080) ──┐
-                                                       ├──► FastAPI ── SQLite en ./data
-App nativa (Expo Android/iOS) ── HTTPS /api/* ─────────┘      │
-                                                              ├── servicios
-                                                              ├── bot Telegram polling
-                                                              ├── APScheduler
-                                                              └── pg_dump/pg_restore ── PostgreSQL
-                                                                            └──────── S3 opcional
+App nativa (Expo Android/iOS) ── HTTPS /api/* ──► acceso privado (Tailscale)
+                                                   │
+                                                   ▼
+                                              FastAPI ── SQLite en ./data
+                                                   ├── servicios
+                                                   ├── APScheduler
+                                                   └── pg_dump/pg_restore ── PostgreSQL
+                                                                 └──────── S3 opcional
+
+Transición actual: SPA web + nginx y polling de Telegram siguen en el despliegue
+hasta completar la paridad móvil. No forman parte de la arquitectura final.
 ```
 
-Compose tiene dos contenedores: `backend` y `frontend`. Dentro de `backend`, `main.py` coordina FastAPI, el polling de Telegram y APScheduler en el mismo proceso/event loop. Los trabajos bloqueantes de base de datos, `pg_dump` y algunos clientes se envían a hilos cuando se invocan desde tareas async. SQLite usa conexiones breves por operación, WAL, foreign keys y busy timeout.
+Compose tiene hoy dos contenedores: `backend` y `frontend`. Durante la transición `main.py` coordina FastAPI, el polling de Telegram y APScheduler en un proceso/event loop. El destino conserva API y scheduler en el backend único, pero retira el contenedor de interfaz web y Telegram. Los trabajos bloqueantes de DB, `pg_dump` y algunos clientes se envían a hilos cuando se invocan desde tareas async. SQLite usa conexiones breves por operación, WAL, foreign keys y busy timeout.
 
 ## Arranque del backend
 
 `backend/main.py` ejecuta, en orden: configuración/logging; inicialización y migración SQLite; creación del primer admin web; self-backup inicial si falta; purga de retención; barrido de restos de backups en claro; sincronización off-site opcional; creación de FastAPI y bot; scheduler y resincronización de crons de proyectos; inicio del polling y servicio Uvicorn. Al apagar el servidor cancela el polling y el scheduler.
 
-El frontend web compila React/Vite a estáticos y nginx sirve la SPA y enruta `/api/` hacia `backend:8080`. El puerto publicado escucha en loopback; el backend solo se expone dentro de la red Compose. Para acceso web remoto el runbook usa Tailscale Serve. La app nativa se desarrolla en `mobile/`, no es un servicio Docker y llama a la misma API por la URL configurada en `EXPO_PUBLIC_API_URL` (por ejemplo, vía HTTPS/Tailscale).
+Hoy nginx sirve React/Vite y enruta `/api/` hacia `backend:8080`; solo el frontend publica loopback. Al retirar la SPA, cambiar a un gateway API mínimo o publicar el backend exclusivamente en loopback para Tailscale Serve. Verificar antes proxy headers confiables, límites, cabeceras de seguridad, HTTPS y timeouts. La app nativa en `mobile/` es el único cliente final y llama a la API mediante `EXPO_PUBLIC_API_URL`.
 
 ## Capas del backend
 
