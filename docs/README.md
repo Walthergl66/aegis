@@ -13,7 +13,7 @@ Guía de referencia del repositorio. Describe la implementación observada en el
 | [Datos y persistencia](datos/README.md) | Esquema SQLite, relaciones, migraciones y cifrado de campos. |
 | [Backups y planificación](backups/README.md) | Flujo de backup, verificación, retención, scheduler y copia remota. |
 | [Bot y notificaciones](bot/README.md) | Comandos, registro, autorización y mensajes operativos. |
-| [Frontend web y PWA](frontend/README.md) | Rutas del panel web, servicios y políticas de sesión/cache; la PWA no es el cliente móvil objetivo. |
+| [Frontend legado](frontend/README.md) | Inventario del panel web transitorio y su retiro tras completar paridad móvil. |
 | [Seguridad](seguridad/README.md) | Controles, claves, sesiones, límites y datos sensibles. |
 | [Configuración](configuracion/README.md) | Variables, valores por defecto y efectos de rotación. |
 | [Instalación y operación](operacion/README.md) | Entorno local, Docker, tareas frecuentes e incidentes. |
