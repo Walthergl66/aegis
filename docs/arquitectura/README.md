@@ -3,19 +3,14 @@
 ## Vista general
 
 ```text
-Navegador (React/PWA)
-        │ mismo origen: /api/*
-        ▼
-nginx (frontend, puerto publicado 127.0.0.1:8080)
-        │ proxy interno
-        ▼
-FastAPI ─────────────── SQLite en ./data
-   │                         ▲
-   ├── servicios             │
-   ├── bot Telegram polling  │
-   ├── APScheduler ──────────┘
-   └── pg_dump/pg_restore ── PostgreSQL/Supabase
-              └──────────── S3 compatible opcional
+Navegador (React/PWA web) ──► nginx (127.0.0.1:8080) ──┐
+                                                       ├──► FastAPI ── SQLite en ./data
+App nativa (Expo Android/iOS) ── HTTPS /api/* ─────────┘      │
+                                                              ├── servicios
+                                                              ├── bot Telegram polling
+                                                              ├── APScheduler
+                                                              └── pg_dump/pg_restore ── PostgreSQL
+                                                                            └──────── S3 opcional
 ```
 
 Compose tiene dos contenedores: `backend` y `frontend`. Dentro de `backend`, `main.py` coordina FastAPI, el polling de Telegram y APScheduler en el mismo proceso/event loop. Los trabajos bloqueantes de base de datos, `pg_dump` y algunos clientes se envían a hilos cuando se invocan desde tareas async. SQLite usa conexiones breves por operación, WAL, foreign keys y busy timeout.
@@ -24,7 +19,7 @@ Compose tiene dos contenedores: `backend` y `frontend`. Dentro de `backend`, `ma
 
 `backend/main.py` ejecuta, en orden: configuración/logging; inicialización y migración SQLite; creación del primer admin web; self-backup inicial si falta; purga de retención; barrido de restos de backups en claro; sincronización off-site opcional; creación de FastAPI y bot; scheduler y resincronización de crons de proyectos; inicio del polling y servicio Uvicorn. Al apagar el servidor cancela el polling y el scheduler.
 
-El frontend compila React/Vite a estáticos y nginx sirve la SPA y enruta `/api/` hacia el nombre Docker `backend:8080`. El puerto publicado escucha en loopback; el backend solo se expone dentro de la red Compose. Para acceso remoto el runbook usa Tailscale Serve.
+El frontend web compila React/Vite a estáticos y nginx sirve la SPA y enruta `/api/` hacia `backend:8080`. El puerto publicado escucha en loopback; el backend solo se expone dentro de la red Compose. Para acceso web remoto el runbook usa Tailscale Serve. La app nativa se desarrolla en `mobile/`, no es un servicio Docker y llama a la misma API por la URL configurada en `EXPO_PUBLIC_API_URL` (por ejemplo, vía HTTPS/Tailscale).
 
 ## Capas del backend
 
