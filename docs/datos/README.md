@@ -15,6 +15,7 @@ SQLite almacena configuración del panel, usuarios, historial y auditoría. La r
 | `audit_log` | Acción, resultado, fecha, proyecto y actor Telegram/web opcional. |
 | `refresh_sessions` | Hash de refresh token, usuario y expiración; cascada al borrar el usuario web. |
 | `access_token_revocations` | `jti` revocado y vencimiento del JWT; conserva revocaciones entre reinicios y permite purgar las expiradas. |
+| `backup_jobs` | Cola persistente para solicitudes web, usuario solicitante, clave idempotente, estado, tiempos y vínculo al historial. |
 
 El esquema íntegro, columnas, índices y restricciones está en `backend/db/schema.sql`. La auditoría no define FK para `project_id`; las tablas de permisos e historial sí vinculan proyecto/usuario según el esquema.
 
