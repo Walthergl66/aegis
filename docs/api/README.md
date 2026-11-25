@@ -1,15 +1,15 @@
 # API y permisos
 
-La API es JSON bajo `/api/*`. Las rutas salvo salud y login requieren `Authorization: Bearer <access-token>`, excepto refresh/logout, que además usan la cookie de refresh. Swagger/ReDoc/OpenAPI se habilitan solo con `WEB_DOCS_ENABLED=true`, bajo `/api/docs`, `/api/redoc` y `/api/openapi.json`.
+La API es JSON bajo `/api/*`. Las rutas salvo salud y login requieren `Authorization: Bearer <access-token>`. El cliente web usa cookie HttpOnly para refresh/logout; el cliente nativo envía su refresh token en el cuerpo JSON. Swagger/ReDoc/OpenAPI se habilitan solo con `WEB_DOCS_ENABLED=true`, bajo `/api/docs`, `/api/redoc` y `/api/openapi.json`.
 
 ## Rutas
 
 | Método y ruta | Acceso | Uso |
 |---|---|---|
 | `GET /api/health` | Público | Healthcheck `{"status":"ok"}`. |
-| `POST /api/auth/login` | Público, limitado | Inicia sesión; acepta código TOTP si la cuenta lo exige. |
-| `POST /api/auth/refresh` | Cookie de refresh | Rota sesión y devuelve nuevo access token. |
-| `POST /api/auth/logout` | Sesión | Revoca la sesión/token actual. |
+| `POST /api/auth/login` | Público, limitado | Acepta username, password y `code` TOTP cuando se exige. Con `client_type: "native"`, incluye `refresh_token` en JSON además de la cookie que mantiene el flujo web. |
+| `POST /api/auth/refresh` | Cookie web o JSON nativo | Acepta cookie `sb_refresh_token` o cuerpo `{ "refresh_token": "…" }`; rota el token y, para solicitud nativa, devuelve el nuevo refresh token en JSON junto al access token. |
+| `POST /api/auth/logout` | Cookie web o JSON nativo | Revoca el refresh token de cookie o cuerpo `{ "refresh_token": "…" }`; con Bearer también revoca el access token. |
 | `GET /api/auth/me` | Sesión | Devuelve identidad y rol actuales. |
 | `POST /api/auth/totp/setup`, `/confirm`, `/disable` | Sesión | Configura, confirma o desactiva TOTP. |
 | `GET /api/dashboard` | Sesión | Conteos, proyectos activos y auditoría reciente. |
@@ -39,6 +39,6 @@ Los detalles de los cuerpos, respuestas y errores se definen en las funciones de
 
 ## Sesiones
 
-Access JWT HS256 de corta duración viaja en Bearer. El refresh token va en cookie HttpOnly, se rota en cada refresh y en SQLite solo se conserva su hash. Cada request autenticado vuelve a consultar el usuario para reflejar desactivación y cambios de rol; la revocación del access token se guarda en SQLite y sobrevive reinicios. El bloqueo por intentos fallidos se aplica al login, no a sesiones ya autenticadas.
+Access JWT HS256 de corta duración viaja en Bearer. En web, el refresh token se administra en cookie HttpOnly; en nativo viaja en JSON y el cliente lo conserva en SecureStore. Ambos flujos rotan refresh tokens y en SQLite solo se conserva el hash. Cada request autenticado vuelve a consultar el usuario para reflejar desactivación y cambios de rol; la revocación del access token se guarda en SQLite y sobrevive reinicios. El bloqueo por intentos fallidos se aplica al login, no a sesiones ya autenticadas.
 
 Errores de validación/autorización se devuelven como JSON `detail`. El middleware de throttling puede responder HTTP 429. Un JSON malformado devuelve 400. La referencia interactiva es opcional y debe mantenerse apagada en producción salvo que se necesite.
