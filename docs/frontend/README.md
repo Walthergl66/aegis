@@ -22,6 +22,7 @@ La UI controla navegación con `RequireAuth`, `RequireAdmin` y menús condiciona
 - `services/{auth,accounts,projects,users,webUsers,backups,audit,imports,totp,dashboard}.js`: adaptadores de endpoints.
 - El servicio de proyectos consulta `/api/projects/test-connection` antes de guardar una URI; el formulario envía `provider` y, para PostgreSQL directo, las opciones `no_owner`/`no_privileges`.
 - En Proyectos, el admin puede usar **Respaldar ahora**. El cliente crea una clave `Idempotency-Key`, encola el trabajo y consulta su estado por polling. Guarda el ID activo en `localStorage` para reanudar el seguimiento tras recargar la página.
+- En el historial por proyecto, admin puede descargar el dump de un backup exitoso. El cliente recibe el archivo por streaming autenticado.
 - `components/layout/`: navegación y shell autenticado.
 - `components/ui/`: diálogo, paginación, mensajes y elementos reutilizables.
 - `hooks/useAbort.js`: cancelación de fetches al desmontar o cambiar consulta.
