@@ -8,9 +8,9 @@ La aplicación es una SPA React 18 con React Router, compilada por Vite y servid
 |---|---|---|
 | `/login` | Inicio de sesión | Público. |
 | `/` | Dashboard | Usuario autenticado. |
-| `/proyectos`, `/proyectos/:id/historial` | Lista e historial | Autenticado. |
-| `/proyectos/nuevo`, `/proyectos/:id/editar` | Formulario de proyecto | La ruta se agrupa en `RequireAdmin`. |
-| `/cuentas/*`, `/usuarios/*`, `/usuarios-web/*`, `/importar` | Administración de datos y usuarios/importación | Admin. |
+| `/proyectos`, `/proyectos/:id/historial` | Lista e historial; la lista filtra por proveedor PostgreSQL o Supabase | Autenticado. |
+| `/proyectos/nuevo`, `/proyectos/:id/editar` | Formulario: proveedor, grupo/cuenta compatible, URI, prueba de conexión y cron; permite flags de compatibilidad de dump | La ruta se agrupa en `RequireAdmin`. |
+| `/cuentas/*`, `/usuarios/*`, `/usuarios-web/*`, `/importar` | Administración de grupos PostgreSQL/cuentas Supabase, usuarios e importación | Admin. |
 | `/backups`, `/auditoria`, `/seguridad` | Historial general, bitácora y TOTP del usuario | Autenticado. |
 
 La UI controla navegación con `RequireAuth`, `RequireAdmin` y menús condicionados por rol. El backend revalida las autorizaciones en cada endpoint; ocultar una ruta no es un control de seguridad.
@@ -20,6 +20,7 @@ La UI controla navegación con `RequireAuth`, `RequireAdmin` y menús condiciona
 - `features/auth/AuthContext.jsx`: estado de usuario, recuperación de sesión, login/logout.
 - `services/http.js`: fetch JSON, Bearer, cookie, renovación concurrente de access token y tratamiento de errores.
 - `services/{auth,accounts,projects,users,webUsers,backups,audit,imports,totp,dashboard}.js`: adaptadores de endpoints.
+- El servicio de proyectos consulta `/api/projects/test-connection` antes de guardar una URI; el formulario envía `provider` y, para PostgreSQL directo, las opciones `no_owner`/`no_privileges`.
 - `components/layout/`: navegación y shell autenticado.
 - `components/ui/`: diálogo, paginación, mensajes y elementos reutilizables.
 - `hooks/useAbort.js`: cancelación de fetches al desmontar o cambiar consulta.
