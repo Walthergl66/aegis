@@ -10,6 +10,7 @@ export default function RootLayout() {
         <Stack.Screen name="login" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="projects/new" options={{ headerShown: true, title: 'Nueva conexión' }} />
+        <Stack.Screen name="import/supabase" options={{ headerShown: true, title: 'Importar Supabase' }} />
         <Stack.Screen name="projects/[id]/edit" options={{ headerShown: true, title: 'Editar proyecto' }} />
         <Stack.Screen name="projects/[id]" options={{ headerShown: true, title: 'Proyecto' }} />
       </Stack>

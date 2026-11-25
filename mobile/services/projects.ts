@@ -38,6 +38,8 @@ export type ProjectHistory = {
   stats: Record<string, unknown>;
 };
 
+export type AvailableSupabaseProject = { ref: string; name: string };
+
 export async function listProjects(request: SessionRequest) {
   return request<Project[]>('/projects?estado=activos');
 }
@@ -68,6 +70,30 @@ export async function updateProject(request: SessionRequest, projectId: number, 
 
 export async function archiveProject(request: SessionRequest, projectId: number) {
   return request<{ ok: boolean }>('/projects/' + projectId, { method: 'DELETE' });
+}
+
+export async function fetchSupabaseProjects(request: SessionRequest, pat: string) {
+  return request<{ available: AvailableSupabaseProject[]; existing_count: number }>('/import/fetch', {
+    method: 'POST',
+    body: JSON.stringify({ pat }),
+  });
+}
+
+export async function importSupabaseProjects(request: SessionRequest, payload: {
+  pat: string;
+  account_name: string;
+  selected_projects: string[];
+  db_password?: string;
+  pooler_mode: 'session' | 'transaction';
+  test_connection: boolean;
+}) {
+  return request<{ created: number; errors: string[]; account_name: string }>(
+    '/import/create',
+    {
+      method: 'POST',
+      body: JSON.stringify({ ...payload, client_type: 'native' }),
+    },
+  );
 }
 
 export async function createPostgresProject(request: SessionRequest, data: {
