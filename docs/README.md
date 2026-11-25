@@ -23,7 +23,7 @@ Guía de referencia del repositorio. Describe la implementación observada en el
 ```text
 backend/main.py              arranque del único proceso
 backend/api/                 FastAPI, dependencias y endpoints JSON
-backend/services/            persistencia y lógica de acceso a datos
+backend/services/            persistencia, lógica de datos y proveedores
 backend/core/                configuración, DB, cifrado, JWT y utilidades
 backend/backup/              ejecución, scheduler, retención y destino S3
 backend/bot/                 polling y handlers de Telegram
@@ -38,8 +38,8 @@ data/                         volumen de runtime, fuera de Git
 
 ## Convenciones de mantenimiento
 
-- Toda lectura/escritura de aplicación en SQLite debe pasar por `backend/services/`; `backend/core/db.py` ofrece la conexión y primitivas SQL compartidas.
+- Toda lectura/escritura de dominio en SQLite debe pasar por `backend/services/`; `backend/core/db.py` ofrece la conexión y primitivas SQL compartidas. `services/providers/` adapta capacidades específicas de PostgreSQL y Supabase.
 - Las rutas de `backend/api/` son JSON y delegan persistencia a `services/`.
 - El backend sigue siendo un solo proceso: no separar API, bot y scheduler en servicios independientes sin revisar el uso compartido de SQLite y las instrucciones del proyecto.
 - Actualiza el documento del dominio correspondiente cuando cambie una ruta, tabla, proceso operativo o responsabilidad de módulo.
-- `docs/DEPLOY_MODELO_A.md` es el runbook de despliegue existente; esta guía lo enlaza en vez de duplicar sus pasos de infraestructura.
+- `docs/despliegue/README.md` es el runbook de despliegue existente; esta guía lo enlaza en vez de duplicar sus pasos de infraestructura.
