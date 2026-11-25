@@ -38,6 +38,23 @@ export async function listProjects(request: SessionRequest) {
   return request<Project[]>('/projects?estado=activos');
 }
 
+export async function testPostgresConnection(request: SessionRequest, connection: string) {
+  return request<{ ok: boolean; detalle: string; server_version?: string; latency_ms?: number }>(
+    '/projects/test-connection',
+    { method: 'POST', body: JSON.stringify({ connection, provider: 'postgres' }) },
+  );
+}
+
+export async function createPostgresProject(request: SessionRequest, data: {
+  slug?: string;
+  nombre: string;
+  connection: string;
+  schedule?: string;
+  backup_options: { no_owner: boolean; no_privileges: boolean };
+}) {
+  return request<{ id: number }>('/projects', { method: 'POST', body: JSON.stringify({ ...data, provider: 'postgres' }) });
+}
+
 export async function startBackup(request: SessionRequest, projectId: number, idempotencyKey: string) {
   return request<BackupJob>('/projects/' + projectId + '/backup-jobs', {
     method: 'POST',

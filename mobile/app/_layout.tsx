@@ -9,6 +9,8 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="projects/new" options={{ headerShown: true, title: 'Nueva conexión' }} />
+        <Stack.Screen name="projects/[id]" options={{ headerShown: true, title: 'Proyecto' }} />
       </Stack>
     </SessionProvider>
   );

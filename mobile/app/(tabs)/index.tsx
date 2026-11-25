@@ -1,5 +1,6 @@
+import { router, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -26,7 +27,7 @@ export default function HomeScreen() {
     }
   }, [request]);
 
-  useEffect(() => { void load(); }, [load]);
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -37,9 +38,12 @@ export default function HomeScreen() {
             <Text style={styles.kicker}>BACKUPS POSTGRESQL</Text>
             <Text style={styles.title}>Hola, {user?.username}</Text>
           </View>
-          <Pressable accessibilityRole="button" accessibilityLabel="Cerrar sesión" onPress={() => void signOut()} style={styles.avatar}>
-            <Text style={styles.avatarText}>{user?.username.slice(0, 1).toUpperCase()}</Text>
-          </Pressable>
+          <View style={styles.topActions}>
+            {user?.rol === 'admin' && <Pressable accessibilityRole="button" onPress={() => router.push('/projects/new')} style={styles.addButton}><Text style={styles.addText}>+</Text></Pressable>}
+            <Pressable accessibilityRole="button" accessibilityLabel="Cerrar sesión" onPress={() => void signOut()} style={styles.avatar}>
+              <Text style={styles.avatarText}>{user?.username.slice(0, 1).toUpperCase()}</Text>
+            </Pressable>
+          </View>
         </View>
         <View style={styles.hero}>
           <View style={styles.statusDot} />
@@ -73,6 +77,9 @@ const styles = StyleSheet.create({
   kicker: { color: '#64748b', fontSize: 10, letterSpacing: 1.5, fontWeight: '800', marginBottom: 7 },
   title: { color: '#0f172a', fontSize: 27, fontWeight: '800', letterSpacing: -0.5 },
   avatar: { width: 44, height: 44, borderRadius: 15, backgroundColor: '#dbeafe', alignItems: 'center', justifyContent: 'center' },
+  topActions: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  addButton: { width: 40, height: 40, borderRadius: 14, backgroundColor: '#1d4ed8', alignItems: 'center', justifyContent: 'center' },
+  addText: { color: '#fff', fontSize: 25, lineHeight: 28, fontWeight: '500' },
   avatarText: { color: '#1d4ed8', fontSize: 17, fontWeight: '800' },
   hero: { backgroundColor: '#0f172a', borderRadius: 22, padding: 22, minHeight: 180, justifyContent: 'center' },
   statusDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#4ade80', marginBottom: 13 },
