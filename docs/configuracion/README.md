@@ -53,3 +53,7 @@ Los defaults locales y Docker de `DB_PATH`/`BACKUP_DIR` difieren: en Docker Comp
 ## Cambios de configuración sensibles
 
 Las claves no son intercambiables ni se pueden rotar sin recifrado planificado. Cambiar `SESSION_SECRET` invalida sesiones activas. `WEB_ADMIN_*` solo se usa cuando no hay usuarios web; luego cambia usuarios desde el panel. Mantén nginx `proxy_read_timeout` por encima del timeout del backup.
+
+## App móvil
+
+El cliente Expo usa una variable de entorno separada, no una variable del backend: `EXPO_PUBLIC_API_URL` se configura en `mobile/.env.local` a partir de [`mobile/.env.example`](../../mobile/.env.example). Debe incluir la base `/api` (por ejemplo, `https://servidor-accesible/api`); la app añade `/auth/login`, `/auth/refresh` y `/auth/logout`. Es una URL pública que queda incorporada al bundle, no debe contener secretos.
