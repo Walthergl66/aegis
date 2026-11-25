@@ -1,6 +1,8 @@
 # Despliegue "Modelo A" + Runbook
 
-Objetivo: una copia privada del panel en una **VM Oracle Cloud (Always Free, Ubuntu
+Estado de transición: este runbook mantiene el panel legado accesible solo por Tailscale. El objetivo de producto es operar desde la app móvil y retirar la SPA cuando tenga paridad.
+
+Objetivo de despliegue final: API privada para la app nativa en una **VM Oracle Cloud (Always Free, Ubuntu
 22.04/24.04)** accesible **solo por Tailscale** (sin exponer puertos a Internet), con
 backups locales cifrados y, si se configura, copia fuera del sitio (R2/S3/B2). Este
 mismo compose funciona en un VPS cualquiera; la diferencia es que aquí **nada escucha
@@ -55,8 +57,9 @@ sudo tailscale up --ssh            # inicia sesión con la cuenta de Tailnet
 sudo tailscale serve --bg 8080     # ¡esto expone http://<tailnet-ip>/ -> localhost:8080
 ```
 
-`tailscale serve` entrega **HTTPS automático** (`https://<maquina>.<tailnet>.ts.net`)
-sin configurar certificados. El panel queda SOLO accesible para nodos de tu tailnet.
+tailscale serve entrega **HTTPS automático** (`https://<maquina>.<tailnet>.ts.net`)
+sin configurar certificados. Durante la transición sirve la SPA; tras retirarla debe
+enrutar solo a un gateway/API local, accesible para nodos de tu tailnet.
 
 ## 4. Despliega la aplicación
 
