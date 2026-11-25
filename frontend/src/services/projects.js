@@ -22,3 +22,11 @@ export const getProjectHistory = (id, options) => api.get(`/api/projects/${id}/h
 
 export const testProjectConnection = (connection, provider = 'postgres') =>
   api.post('/api/projects/test-connection', { connection, provider })
+
+export const enqueueBackup = (projectId, idempotencyKey) =>
+  api.post(`/api/projects/${projectId}/backup-jobs`, {}, {
+    headers: { 'Idempotency-Key': idempotencyKey },
+  })
+
+export const getBackupJob = (jobId, options) =>
+  api.get(`/api/backups/jobs/${jobId}`, options)

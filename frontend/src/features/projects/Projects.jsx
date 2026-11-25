@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { deleteProject, listProjects, restoreProject } from '../../services/projects.js'
+import { deleteProject, enqueueBackup, getBackupJob, listProjects, restoreProject } from '../../services/projects.js'
 import { useAuth } from '../auth/AuthContext.jsx'
 import { useAbort, isAbortError } from '../../hooks/useAbort.js'
 import PageHead from '../../components/ui/PageHead.jsx'
@@ -9,13 +9,23 @@ import { useDialog } from '../../components/ui/ConfirmDialog.jsx'
 import Badge from '../../components/ui/Badge.jsx'
 
 const PROVIDER_LABELS = { supabase: 'Supabase', postgres: 'PostgreSQL' }
+const JOB_LABELS = {
+  queued: 'En cola',
+  running: 'En ejecución',
+  completed: 'Completado',
+  failed: 'Falló',
+  interrupted: 'Interrumpido',
+}
 
 export default function Projects() {
   const toast = useToast()
   const { confirm, prompt } = useDialog()
   const signal = useAbort()
   const [projects, setProjects] = useState([])
+  const [backupJobs, setBackupJobs] = useState({})
+  const [startingBackup, setStartingBackup] = useState(null)
   const [error, setError] = useState('')
+  const completedJobs = useRef(new Set())
   const [params, setParams] = useSearchParams()
   const estado = params.get('estado') || 'activos'
   const provider = params.get('provider') || ''
@@ -29,7 +39,15 @@ export default function Projects() {
 
   const load = () => {
     listProjects(estado, provider, { signal })
-      .then(setProjects)
+      .then((items) => {
+        setProjects(items)
+        const savedJobs = {}
+        items.forEach((project) => {
+          const jobId = localStorage.getItem(`sb_backup_job_${project.id}`)
+          if (jobId) savedJobs[project.id] = { id: jobId, status: 'queued' }
+        })
+        if (Object.keys(savedJobs).length) setBackupJobs((current) => ({ ...savedJobs, ...current }))
+      })
       .catch((e) => {
         if (!isAbortError(e)) setError(e.message)
       })
@@ -45,6 +63,41 @@ export default function Projects() {
     if (error) toast.err(error)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [error])
+
+  useEffect(() => {
+    const active = Object.entries(backupJobs).filter(([, job]) =>
+      ['queued', 'running'].includes(job.status),
+    )
+    if (!active.length) return undefined
+    const timer = setTimeout(async () => {
+      const results = await Promise.all(active.map(async ([projectId, job]) => {
+        try {
+          return [projectId, await getBackupJob(job.id)]
+        } catch (err) {
+          if (err.status === 404) {
+            return [projectId, { id: job.id, status: 'interrupted', detail: 'No se encontró el trabajo guardado.' }]
+          }
+          return [projectId, job]
+        }
+      }))
+      setBackupJobs((current) => {
+        const next = { ...current }
+        results.forEach(([projectId, job]) => {
+          next[projectId] = job
+          if (!['queued', 'running'].includes(job.status)) {
+            localStorage.removeItem(`sb_backup_job_${projectId}`)
+            if (!completedJobs.current.has(job.id)) {
+              completedJobs.current.add(job.id)
+              if (job.status === 'completed') toast.ok(`Backup de ${job.slug || projectId} completado.`)
+              else toast.err(job.detail || `El backup de ${job.slug || projectId} no se completó.`)
+            }
+          }
+        })
+        return next
+      })
+    }, 1800)
+    return () => clearTimeout(timer)
+  }, [backupJobs, toast])
 
   const del = async (p) => {
     const ok = await confirm(`¿Eliminar el proyecto "${p.slug}"? Se conserva su historial.`, {
@@ -75,6 +128,21 @@ export default function Projects() {
       load()
     } catch (e) {
       toast.err(e.message)
+    }
+  }
+
+  const startBackup = async (project) => {
+    setStartingBackup(project.id)
+    try {
+      const key = crypto.randomUUID()
+      const job = await enqueueBackup(project.id, key)
+      localStorage.setItem(`sb_backup_job_${project.id}`, job.id)
+      completedJobs.current.delete(job.id)
+      setBackupJobs((current) => ({ ...current, [project.id]: job }))
+    } catch (err) {
+      toast.err(err.message)
+    } finally {
+      setStartingBackup(null)
     }
   }
 
@@ -143,6 +211,20 @@ export default function Projects() {
                   <td className="td-actions">
                     {p.activo ? (
                       <>
+                        {backupJobs[p.id] && (
+                          <span className="muted" role="status">
+                            {JOB_LABELS[backupJobs[p.id].status] || 'Estado desconocido'}
+                          </span>
+                        )}
+                        {isAdmin && (
+                          <button
+                            className="btn-link"
+                            onClick={() => startBackup(p)}
+                            disabled={startingBackup === p.id || ['queued', 'running'].includes(backupJobs[p.id]?.status)}
+                          >
+                            {startingBackup === p.id ? 'Enviando…' : 'Respaldar ahora'}
+                          </button>
+                        )}
                         <Link className="btn-link" to={`/proyectos/${p.id}/historial`}>Historial</Link>
                         {isAdmin && (
                           <>
