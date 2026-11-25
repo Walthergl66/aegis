@@ -167,6 +167,8 @@ async def daily_summary_job(log: logging.Logger) -> None:
 
 async def daily_self_backup_job(log: logging.Logger) -> None:
     """Self-backup diario de la base de datos + envío a Telegram (opcional)."""
+    if settings().database_url:
+        return  # Supabase gestiona las copias de la base PostgreSQL.
     try:
         enc = await asyncio.to_thread(self_backup_mod.run_self_backup)
         if enc.exists():
@@ -204,19 +206,20 @@ def setup_scheduler(log: logging.Logger) -> AsyncIOScheduler:
         pass
 
     scheduler = AsyncIOScheduler(timezone=tzinfo)
-    scheduler.add_job(
-        daily_self_backup_job,
-        CronTrigger(hour=hour, minute=minute, timezone=tzinfo),
-        args=[log],
-        id="self_backup_daily",
-        misfire_grace_time=3600,
-        coalesce=True,
-    )
+    if not cfg.database_url:
+        scheduler.add_job(
+            daily_self_backup_job,
+            CronTrigger(hour=hour, minute=minute, timezone=tzinfo),
+            args=[log],
+            id="self_backup_daily",
+            misfire_grace_time=3600,
+            coalesce=True,
+        )
+        log.info(
+            "Self-backup diario de SQLite programado a las %02d:%02d (%s)",
+            hour, minute, tzinfo,
+        )
     scheduler.start()
-    log.info(
-        "Self-backup diario de la base programado a las %02d:%02d (%s)",
-        hour, minute, tzinfo,
-    )
 
     scheduler.add_job(
         retention_purge_job,
@@ -258,7 +261,8 @@ async def main() -> None:
 
     db_core.init_db()
     bootstrap_admin()
-    self_backup_mod.maiden_run_safe()
+    if not cfg.database_url:
+        self_backup_mod.maiden_run_safe()
     retention_purge()
     removed = cleanup_mod.sweep_plaintext_backups()
     if removed:

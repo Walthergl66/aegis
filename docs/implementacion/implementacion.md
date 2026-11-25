@@ -6,7 +6,7 @@
 
 ## Estado actual del plan
 
-La app móvil ya incluye registro personal, inicio de sesión, conexiones PostgreSQL/Supabase, backups, historial y descargas. Los recursos se guardan en el backend con propietario; al iniciar sesión desde otro dispositivo, la app obtiene el mismo espacio desde la API. El panel web y su contenedor están retirados, y la API se enlaza a loopback para acceso privado.
+La app móvil ya incluye registro personal, inicio de sesión, conexiones PostgreSQL/Supabase, backups, historial y descargas. Los recursos se guardan con propietario y se sincronizan al iniciar sesión en otro dispositivo. El esquema PostgreSQL para Supabase ya está preparado sin datos iniciales; falta crear el proyecto `controldata`, aplicar la migración y configurar `DATABASE_URL` en el backend. Los archivos de backup permanecen en el almacenamiento actual. El panel web y su contenedor están retirados.
 
 El alcance móvil sigue incompleto: faltan una experiencia de cron más completa, dispositivos, recuperación de contraseña, auditoría en la app y push. La importación Supabase tiene un primer flujo; falta validar PAT/contraseña, disponibilidad y errores parciales en dispositivos. La validación en dispositivos físicos y las builds de distribución siguen pendientes. Telegram continúa activo para comandos y alertas operativas.
 

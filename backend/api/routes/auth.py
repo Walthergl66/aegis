@@ -8,13 +8,12 @@ Protección anti fuerza bruta (en capas):
 
 from __future__ import annotations
 
-import sqlite3
-
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
 from api.deps import get_current_user
 from api.rate_limit import limiter
+from core import db
 from core.config import settings
 from core import jwt
 from core.jwt import create_token
@@ -57,7 +56,7 @@ async def register(request: Request):
         user_id = web_users_srv.create_web_user(username, password, rol="admin")
     except web_users_srv.WebUserError as exc:
         return JSONResponse({"detail": str(exc)}, status_code=400)
-    except sqlite3.IntegrityError:
+    except db.INTEGRITY_ERRORS:
         return JSONResponse({"detail": "No se pudo crear la cuenta. Elige otro usuario."}, status_code=409)
 
     ownership_srv.claim_unowned_resources(user_id)

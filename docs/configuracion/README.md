@@ -10,9 +10,10 @@ La plantilla es `backend/.env.example`; `backend/core/config.py` define defaults
 | `ENCRYPTION_KEY` | — | Fernet para PAT/conexiones, obligatorio. |
 | `BACKUP_ENCRYPTION_KEY` | — | Fernet para archivos, obligatorio y distinta. |
 | `SESSION_SECRET` | — | Secreto de firma JWT, obligatorio. |
+| `DATABASE_URL` | vacío | URI PostgreSQL del pooler de sesión de Supabase para el backend persistente. Si está vacío, usa SQLite local. |
 | `WEB_ADMIN_USERNAME` | `admin` | Usuario bootstrap del primer admin. |
 | `WEB_ADMIN_PASSWORD` | vacío | Bootstrap opcional. Si se deja vacía, el primer usuario se registra desde la app. |
-| `DB_PATH` | local `backend/data/backups.db`; Docker `/data/backups.db` | Archivo SQLite. |
+| `DB_PATH` | local `backend/data/backups.db`; Docker `/data/backups.db` | Archivo SQLite para desarrollo/pruebas cuando `DATABASE_URL` está vacío. |
 | `BACKUP_DIR` | local `backend/data/backups`; Docker `/data/backups` | Raíz de copias de proyecto. |
 | `BACKUP_KEEP_COUNT` | `10` | Retención local por proyecto. |
 | `BACKUP_TIMEOUT_SECONDS` | `600` | Timeout de herramientas de backup. |
@@ -47,7 +48,7 @@ La plantilla es `backend/.env.example`; `backend/core/config.py` define defaults
 | `THROTTLE_BLOCK_SECONDS` | `120` | Duración de bloqueo. |
 | `LOG_LEVEL` | `INFO` | Nivel de logging. |
 
-Los defaults locales y Docker de `DB_PATH`/`BACKUP_DIR` difieren: en Docker Compose se fijan explícitamente a `/data` mediante plantilla. La plantilla indica `SELF_BACKUP_TELEGRAM=on`, mientras que si la variable no existe el default del código es `off`; conserva el valor explícito de la plantilla si deseas ese comportamiento.
+`DATABASE_URL` debe mantenerse como secreto de servidor y nunca configurarse en la app móvil. En producción, el backend usa Supabase PostgreSQL; los backups de bases administradas por la app siguen en el volumen local. `DB_PATH` y el self-backup SQLite solo aplican al modo local. La plantilla indica `SELF_BACKUP_TELEGRAM=on`, mientras que si la variable no existe el default del código es `off`.
 
 ## Cambios de configuración sensibles
 

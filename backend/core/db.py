@@ -1,28 +1,75 @@
 """Capa de acceso a la base de datos.
 
-SQLite se usa con conexiones cortas por operación (no se comparte entre
-hilos), WAL y foreign keys activadas. Toda la lógica de lectura/escritura
-pasa por `services/`, que es la única capa que importa SQLite; esto deja
-desacoplada la persistencia para una futura migración a Postgres.
+Supabase/PostgreSQL es el backend compartido en producción. SQLite queda
+disponible para desarrollo y pruebas locales.
 """
 
 from __future__ import annotations
 
 import sqlite3
+import re
 from pathlib import Path
 from typing import Any, Iterable
 
 from core.config import settings
 
+try:
+    import psycopg
+    from psycopg.rows import dict_row
+except ImportError:  # SQLite-only environments (e.g. lightweight tests)
+    psycopg = None
+    dict_row = None
+
+INTEGRITY_ERRORS = (sqlite3.IntegrityError,) + (
+    (psycopg.IntegrityError,) if psycopg is not None else ()
+)
+
 # Versión del esquema. Se incrementa con cada migración incremental para
 # poder auditar en qué estado está una base existente.
 SCHEMA_VERSION = 4
 
-# Cuenta/grupo por defecto para proyectos PostgreSQL sin proveedor cloud.
+# Nombre del grupo creado de forma diferida para una conexión PostgreSQL directa.
 DEFAULT_GROUP_NAME = "Conexiones directas"
 
 
-def connect() -> sqlite3.Connection:
+class _PostgresConnection:
+    """Small adapter preserving the DB helpers' sqlite-style `?` placeholders."""
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    def __enter__(self):
+        self._conn.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return self._conn.__exit__(exc_type, exc, tb)
+
+    def execute(self, sql: str, params: Iterable[Any] = ()):
+        sql = sql.replace("datetime('now')", "CURRENT_TIMESTAMP::text")
+        sql = re.sub(r"\bowner_user_id\s+IS\s+\?", "owner_user_id IS NOT DISTINCT FROM ?", sql)
+        return self._conn.execute(sql.replace("?", "%s"), tuple(params))
+
+    def executemany(self, sql: str, seq_of_params: Iterable[Iterable[Any]]):
+        sql = sql.replace("datetime('now')", "CURRENT_TIMESTAMP::text")
+        sql = re.sub(r"\bowner_user_id\s+IS\s+\?", "owner_user_id IS NOT DISTINCT FROM ?", sql)
+        return self._conn.executemany(sql.replace("?", "%s"), seq_of_params)
+
+
+def connect():
+    cfg = settings()
+    if cfg.database_url:
+        if psycopg is None:
+            raise RuntimeError("DATABASE_URL requiere instalar psycopg[binary].")
+        return _PostgresConnection(
+            psycopg.connect(
+                cfg.database_url,
+                sslmode="require",
+                connect_timeout=10,
+                row_factory=dict_row,
+                prepare_threshold=None,
+            )
+        )
     conn = sqlite3.connect(settings().db_path)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
@@ -32,8 +79,19 @@ def connect() -> sqlite3.Connection:
 
 
 def init_db() -> None:
-    """Crea los directorios y ejecuta el esquema solo si la base aún no existe."""
-    db_path: Path = settings().db_path
+    """Aplica el esquema PostgreSQL o inicializa/migra la SQLite local."""
+    cfg = settings()
+    if cfg.database_url:
+        if psycopg is None:
+            raise RuntimeError("DATABASE_URL requiere instalar psycopg[binary].")
+        schema = Path(__file__).resolve().parent.parent / "db" / "schema.postgres.sql"
+        with connect() as conn:
+            for statement in schema.read_text(encoding="utf-8").split(";"):
+                if statement.strip():
+                    conn.execute(statement)
+        return
+
+    db_path: Path = cfg.db_path
     db_path.parent.mkdir(parents=True, exist_ok=True)
     if not db_path.exists() or db_path.stat().st_size == 0:
         schema = Path(__file__).resolve().parent.parent / "db" / "schema.sql"
@@ -129,35 +187,15 @@ def _migrate() -> None:
             "UPDATE projects SET owner_user_id = (SELECT MIN(id) FROM web_users) "
             "WHERE owner_user_id IS NULL AND EXISTS (SELECT 1 FROM web_users)"
         )
-        _ensure_default_group(conn)
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
 
-def _ensure_default_group(conn: sqlite3.Connection) -> None:
-    """Crea el grupo para conexiones PostgreSQL directas si aún no existe.
-
-    Así los proyectos genéricos siempre tienen un `account_id` válido sin
-    necesidad de reconstruir la tabla `projects` (SQLite no permite quitar
-    el NOT NULL de una FK existente).
-    """
-    from core import crypto
-
-    row = conn.execute(
-        "SELECT id FROM accounts WHERE provider = 'postgres' ORDER BY id LIMIT 1"
-    ).fetchone()
-    if row is None:
-        conn.execute(
-            "INSERT INTO accounts (nombre, provider, pat_encrypted) VALUES (?, 'postgres', ?)",
-            (DEFAULT_GROUP_NAME, crypto.encrypt("")),
-        )
-
-
-def fetch_one(sql: str, params: Iterable[Any] = ()) -> sqlite3.Row | None:
+def fetch_one(sql: str, params: Iterable[Any] = ()):
     with connect() as conn:
         return conn.execute(sql, tuple(params)).fetchone()
 
 
-def fetch_all(sql: str, params: Iterable[Any] = ()) -> list[sqlite3.Row]:
+def fetch_all(sql: str, params: Iterable[Any] = ()):
     with connect() as conn:
         return conn.execute(sql, tuple(params)).fetchall()
 
@@ -165,6 +203,21 @@ def fetch_all(sql: str, params: Iterable[Any] = ()) -> list[sqlite3.Row]:
 def execute(sql: str, params: Iterable[Any] = ()) -> int:
     """Ejecuta una escritura y devuelve el id de la última fila insertada (o -1)."""
     with connect() as conn:
+        if settings().database_url:
+            match = re.match(r"\s*INSERT\s+INTO\s+(\w+)", sql, re.IGNORECASE)
+            if match and "returning" not in sql.lower():
+                table = match.group(1).lower()
+                if table in {
+                    "accounts", "projects", "users", "permissions", "web_users",
+                    "backup_history", "audit_log", "refresh_sessions",
+                }:
+                    cur = conn.execute(sql.rstrip().rstrip(";") + " RETURNING id", params)
+                    row = cur.fetchone()
+                    return int(row["id"]) if row else -1
+                conn.execute(sql, params)
+                return -1
+            cur = conn.execute(sql, params)
+            return -1
         cur = conn.execute(sql, tuple(params))
         return cur.lastrowid if cur.lastrowid is not None else -1
 

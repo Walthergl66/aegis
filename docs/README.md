@@ -10,7 +10,7 @@ Guía de referencia del repositorio. Describe la implementación observada en el
 | [Plan de implementación móvil](implementacion/implementacion.md) | Fases, estado actual, criterios de salida y trabajo pendiente para completar la experiencia móvil. |
 | [Arquitectura](arquitectura/README.md) | Componentes, flujo de arranque, límites entre capas y responsabilidades por módulo. |
 | [API y permisos](api/README.md) | Rutas REST, autenticación, roles y contrato con la app móvil. |
-| [Datos y persistencia](datos/README.md) | Esquema SQLite, relaciones, migraciones y cifrado de campos. |
+| [Datos y persistencia](datos/README.md) | Esquema Supabase PostgreSQL, relaciones y cifrado de campos. |
 | [Backups y planificación](backups/README.md) | Flujo de backup, verificación, retención, scheduler y copia remota. |
 | [Bot y notificaciones](bot/README.md) | Comandos, registro, autorización y mensajes operativos. |
 | [Seguridad](seguridad/README.md) | Controles, claves, sesiones, límites y datos sensibles. |
@@ -29,7 +29,7 @@ backend/core/                configuración, DB, cifrado, JWT y utilidades
 backend/backup/              ejecución, scheduler, retención y destino S3
 backend/bot/                 polling y handlers de Telegram
 backend/notify/              envío a Telegram y resumen de salud
-backend/db/schema.sql        esquema inicial SQLite
+backend/db/schema.postgres.sql esquema inicial vacío PostgreSQL/Supabase
 mobile/                      app nativa Expo/React Native Android e iOS
 docs/                        documentación funcional y operativa
 data/                         volumen de runtime, fuera de Git
@@ -37,8 +37,8 @@ data/                         volumen de runtime, fuera de Git
 
 ## Convenciones de mantenimiento
 
-- Toda lectura/escritura de dominio en SQLite debe pasar por `backend/services/`; `backend/core/db.py` ofrece la conexión y primitivas SQL compartidas. `services/providers/` adapta capacidades específicas de PostgreSQL y Supabase.
+- Toda lectura/escritura de dominio debe pasar por `backend/services/`; `backend/core/db.py` ofrece PostgreSQL en producción y SQLite para desarrollo/pruebas. `services/providers/` adapta capacidades específicas de PostgreSQL y Supabase.
 - Las rutas de `backend/api/` son JSON y delegan persistencia a `services/`.
-- El backend sigue siendo un solo proceso: no separar API, bot y scheduler en servicios independientes sin revisar el uso compartido de SQLite y las instrucciones del proyecto.
+- El backend sigue siendo un solo proceso: no separar API, bot y scheduler en servicios independientes sin revisar el uso compartido de la base de datos y las instrucciones del proyecto.
 - Actualiza el documento del dominio correspondiente cuando cambie una ruta, tabla, proceso operativo o responsabilidad de módulo.
 - `docs/despliegue/README.md` es el runbook de despliegue existente; esta guía lo enlaza en vez de duplicar sus pasos de infraestructura.

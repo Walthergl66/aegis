@@ -12,8 +12,9 @@ Este documento resume controles presentes en la aplicación; el perímetro de re
 
 ## Secretos y backups
 
-- `ENCRYPTION_KEY` protege PAT y cadenas de conexión en SQLite.
+- `ENCRYPTION_KEY` protege PAT y cadenas de conexión almacenados en Supabase PostgreSQL.
 - `BACKUP_ENCRYPTION_KEY` protege backups locales y self-backup. Debe ser distinta de la anterior.
+- `DATABASE_URL` es un secreto solo del backend; nunca se incluye en la app móvil ni en el repositorio.
 - `SESSION_SECRET` firma JWT; cambiarla invalida tokens emitidos.
 - No registrar claves o connection strings: `sanitize.py` redacta secretos antes de mensajes sensibles y la API oculta credenciales completas.
 - En el proveedor PostgreSQL, el parser separa credenciales de la URI y exporta la contraseña como `PGPASSWORD`; no la coloca en el argv de `pg_dump` ni `psql`. El mensaje con URI enviada al flujo `/addbd` se borra al procesarla.

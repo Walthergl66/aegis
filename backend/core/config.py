@@ -51,6 +51,9 @@ class Settings:
 
         self.session_secret: str = self._required("SESSION_SECRET")
 
+        # Si está definido, el backend usa PostgreSQL (p. ej. Supabase).
+        # En desarrollo/tests se puede dejar vacío y usar SQLite local.
+        self.database_url: str = os.getenv("DATABASE_URL", "").strip()
         self.db_path: Path = Path(os.getenv("DB_PATH", str(PROJECT_ROOT / "data" / "backups.db")))
         self.backup_dir: Path = Path(os.getenv("BACKUP_DIR", str(PROJECT_ROOT / "data" / "backups")))
 

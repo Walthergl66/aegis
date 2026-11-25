@@ -18,7 +18,7 @@ docker compose ps
 
 Solo se despliega el backend/API, enlazado a `127.0.0.1:8080`. Configura `EXPO_PUBLIC_API_URL` en la app móvil con el endpoint privado HTTPS (por ejemplo, Tailscale Serve). `./data` persiste DB y backups aunque se eliminen contenedores. `docker compose down` no elimina esa carpeta.
 
-Al instalar por primera vez, crea la cuenta desde la app móvil. Si se configuró `WEB_ADMIN_PASSWORD`, esa cuenta inicial se creó durante el arranque. Las cuentas y sus conexiones se sincronizan al iniciar sesión en otro dispositivo.
+Al instalar por primera vez, el esquema PostgreSQL se crea vacío y no genera cuentas ni conexiones. Crea la primera cuenta desde la app móvil. Las cuentas y sus conexiones se sincronizan al iniciar sesión en otro dispositivo.
 
 ## Desarrollo
 
@@ -54,7 +54,7 @@ Para off-site, configura bucket S3 compatible y todas las variables `OFFSITE_*`,
 
 ## Recuperación
 
-Mantén una copia de las claves separada del host. Para recuperar un `.dump.enc`, usa la misma `BACKUP_ENCRYPTION_KEY`, descifra en un entorno protegido y restaura un dump custom con `pg_restore`; para `.sql.enc`, usa `psql`. Valida primero la recuperación en una base de prueba. Para recuperar la propia configuración SQLite existe un self-backup cifrado `panel_*.sqlite.enc`.
+Mantén una copia de las claves separada del host. Para recuperar un `.dump.enc`, usa la misma `BACKUP_ENCRYPTION_KEY`, descifra en un entorno protegido y restaura un dump custom con `pg_restore`; para `.sql.enc`, usa `psql`. Valida primero la recuperación en una base de prueba. El self-backup cifrado `panel_*.sqlite.enc` solo aplica al modo SQLite local; los backups de la base de producción se administran desde Supabase.
 
 ## Referencias operativas
 

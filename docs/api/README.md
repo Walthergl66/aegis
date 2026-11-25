@@ -38,7 +38,7 @@ Los detalles de los cuerpos, respuestas y errores se definen en las funciones de
 
 ## Sesiones
 
-Access JWT HS256 de corta duración viaja en Bearer. El refresh token viaja en JSON y la app lo conserva en SecureStore; en SQLite solo se conserva su hash. Cada request autenticado vuelve a consultar el usuario para reflejar desactivación y cambios de rol; la revocación del access token se guarda en SQLite y sobrevive reinicios. El bloqueo por intentos fallidos se aplica al login, no a sesiones ya autenticadas.
+Access JWT HS256 de corta duración viaja en Bearer. El refresh token viaja en JSON y la app lo conserva en SecureStore; en Supabase PostgreSQL solo se conserva su hash. Cada request autenticado vuelve a consultar el usuario para reflejar desactivación y cambios de rol; la revocación del access token se guarda en PostgreSQL y sobrevive reinicios. El bloqueo por intentos fallidos se aplica al login, no a sesiones ya autenticadas.
 
 El cliente nativo renueva y reintenta una solicitud protegida una vez al recibir 401. Si el refresh falla con 401, elimina la sesión local para requerir un nuevo login.
 

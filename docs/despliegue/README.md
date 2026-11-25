@@ -20,8 +20,9 @@ Antes de desplegar, guarda las claves en un vault (`pass` con una GPG key privad
 | `ENCRYPTION_KEY` | `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` | No descifras credenciales de la BD del panel |
 | `BACKUP_ENCRYPTION_KEY` | igual que arriba | No descifras NI UN solo backup `.dump.enc`/`.sql.enc` |
 | `SESSION_SECRET` | `openssl rand -hex 32` | Todos los JWT quedan inválidos (sesiones caídas) — no pierdes datos |
+| `DATABASE_URL` | Pooler de sesión del proyecto Supabase | El backend no puede leer/escribir tablas de aplicación |
 | `BOT_TOKEN` | BotFather | El bot deja de funcionar |
-| `WEB_ADMIN_USERNAME/PASSWORD` | tú | Adjunta login inicial |
+| `WEB_ADMIN_USERNAME/PASSWORD` | opcional | Solo crea un usuario inicial si se configura explícitamente |
 
 Recomendado: `pass`.
 
@@ -66,9 +67,9 @@ enrutar solo a un gateway/API local, accesible para nodos de tu tailnet.
 ```bash
 git clone <tu-repo> backups-supabase && cd backups-supabase
 cp backend/.env.example backend/.env
-# Edita backend/.env: completa las claves del vault, WEB_ADMIN_*, BOT_TOKEN, etc.
+# Edita backend/.env: completa las claves del vault, DATABASE_URL, BOT_TOKEN, etc.
 docker compose up -d --build
-docker compose ps            # ambos "healthy"
+docker compose ps            # backend "healthy"
 ```
 
 Opcional (recomendado si hay disk fuera): activa la copia off-site en `.env`:

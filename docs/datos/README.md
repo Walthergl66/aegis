@@ -1,6 +1,8 @@
 # Datos y persistencia
 
-SQLite almacena configuración del panel, usuarios, historial y auditoría. La ruta por defecto local es `backend/data/backups.db`; Compose monta `./data` como `/data` y usa `/data/backups.db`. El directorio `data/` está fuera del control de versiones.
+Supabase PostgreSQL almacena las cuentas de acceso, conexiones, proyectos, sesiones, trabajos, historial y auditoría. El esquema se define en `backend/db/schema.postgres.sql` y crea tablas vacías: no inserta un usuario ni una conexión por defecto. El backend se conecta usando `DATABASE_URL`, guardada solo en `backend/.env`.
+
+SQLite se conserva como alternativa local para desarrollo y pruebas (`DB_PATH`). Los archivos de backup siguen en `BACKUP_DIR` dentro del volumen `./data`; no forman parte de esta migración de tablas.
 
 ## Tablas
 

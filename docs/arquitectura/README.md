@@ -6,7 +6,7 @@
 App nativa (Expo Android/iOS) ── HTTPS /api/* ──► acceso privado (Tailscale)
                                                    │
                                                    ▼
-                                              FastAPI ── SQLite en ./data
+                                              FastAPI ── Supabase PostgreSQL
                                                    ├── servicios
                                                    ├── APScheduler
                                                    └── pg_dump/pg_restore ── PostgreSQL
@@ -16,11 +16,11 @@ El cliente web fue retirado. Telegram permanece como integración de operación
 y alertas; la app móvil es el único cliente de producto.
 ```
 
-Compose ejecuta un único contenedor `backend`. `main.py` coordina FastAPI, polling de Telegram y APScheduler en un proceso/event loop. Los trabajos bloqueantes de DB, `pg_dump` y algunos clientes se envían a hilos cuando se invocan desde tareas async. SQLite usa conexiones breves por operación, WAL, foreign keys y busy timeout.
+Compose ejecuta un único contenedor `backend`. `main.py` coordina FastAPI, polling de Telegram y APScheduler en un proceso/event loop. Los trabajos bloqueantes de DB, `pg_dump` y algunos clientes se envían a hilos cuando se invocan desde tareas async. En producción, el backend usa Supabase PostgreSQL mediante `DATABASE_URL`; SQLite queda para desarrollo/pruebas.
 
 ## Arranque del backend
 
-`backend/main.py` ejecuta, en orden: configuración/logging; inicialización y migración SQLite; creación del primer admin web; self-backup inicial si falta; purga de retención; barrido de restos de backups en claro; sincronización off-site opcional; creación de FastAPI y bot; scheduler y resincronización de crons de proyectos; inicio del polling y servicio Uvicorn. Al apagar el servidor cancela el polling y el scheduler.
+`backend/main.py` ejecuta, en orden: configuración/logging; inicialización del esquema; bootstrap de admin solo si se configuró explícitamente; self-backup solo en modo SQLite; purga de retención; barrido de restos de backups en claro; sincronización off-site opcional; creación de FastAPI y bot; scheduler y resincronización de crons de proyectos; inicio del polling y servicio Uvicorn. Al apagar el servidor cancela el polling y el scheduler.
 
 La API FastAPI publica solo JSON y se enlaza a `127.0.0.1:8080`. El acceso remoto debe ir por Tailscale Serve; no publicar directamente el backend a Internet. La app nativa en `mobile/` llama a la API mediante `EXPO_PUBLIC_API_URL`.
 
@@ -29,7 +29,7 @@ La API FastAPI publica solo JSON y se enlaza a `127.0.0.1:8080`. El acceso remot
 | Área | Responsabilidad |
 |---|---|
 | `core/config.py` | Carga `.env`, valida secretos obligatorios y construye settings tipados. |
-| `core/db.py` + `db/schema.sql` | Conexiones SQLite, inicialización del esquema nuevo y migraciones incrementales. |
+| `core/db.py` + `db/schema.postgres.sql` | Conexiones PostgreSQL en producción, esquema Supabase y compatibilidad SQLite local. |
 | `core/crypto.py`, `jwt.py`, `security.py`, `sanitize.py` | Cifrado de secretos/archivos, tokens, contraseñas y limpieza de mensajes. |
 | `services/` | Persistencia y operaciones para cuentas, proyectos, usuarios, permisos, sesiones, historial, auditoría e integración de proveedores. |
 | `services/providers/` | Contrato común y adaptadores para PostgreSQL directo y Supabase. PostgreSQL provee conexión/prueba; Supabase añade importación y estado cloud. |
@@ -66,7 +66,7 @@ Las rutas de API no deben contener SQL de persistencia: usan `services/`. Las fu
 | `backup/runner.py` | `pg_dump`, verificación con `pg_restore`, generación SQL, cifrado, rotación local y locks por proyecto. |
 | `backup/scheduler_jobs.py` | Resincronización de crons por proyecto y registro/alerta de cada resultado automático. |
 | `backup/web_jobs.py` | Worker async que reclama solicitudes persistidas y ejecuta el runner en un hilo. |
-| `backup/self_backup.py` | Snapshot cifrado de SQLite del panel, rotación y envío opcional a admins. |
+| `backup/self_backup.py` | Snapshot local cifrado de SQLite, rotación y envío opcional a admins; solo se activa en desarrollo. |
 | `backup/offsite.py` | Listado/subida S3 compatible y retención remota por proyecto. |
 | `backup/cleanup.py` | Eliminación de restos en claro al inicio. |
 | `backup/monitor.py` | Funciones auxiliares de estado/conectividad de proyectos consumidas por flujos de monitoreo. |

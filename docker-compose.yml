@@ -11,7 +11,7 @@ services:
     ports:
       - "127.0.0.1:8080:8080" # API privada; publicar remotamente solo por Tailscale Serve
     volumes:
-      - ./data:/data                # SQLite + backups persistidos fuera del contenedor
+      - ./data:/data                # Backups y logs locales persistidos fuera del contenedor
     cap_drop:
       - ALL
     security_opt:
