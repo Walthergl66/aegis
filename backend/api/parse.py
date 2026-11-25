@@ -1,4 +1,4 @@
-"""Helpers de parsing para la API (JSON de entrada desde el frontend)."""
+"""Helpers de parsing para los cuerpos JSON de la API."""
 
 from __future__ import annotations
 

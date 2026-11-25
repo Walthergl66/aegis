@@ -1,8 +1,7 @@
 """Rate limiting de la API (slowapi).
 
-El límite se aplica por IP real del cliente. Detrás del proxy de nginx se
-lee `X-Forwarded-For`; únicamente confiamos en él porque el backend no está
-publicado a la red (solo es alcanzable a través del contenedor frontend).
+El límite se aplica por IP real del cliente. Si existe un proxy confiable,
+se lee `X-Forwarded-For`; el backend se publica solo en loopback.
 """
 
 from __future__ import annotations
@@ -20,11 +19,8 @@ _alert_lock = Lock()
 def _client_address(request) -> str:
     """IP real del cliente.
 
-    Se usa la ÚLTIMA dirección de `X-Forwarded-For`: los proxies confiables
-    (solo nginx vía loopback) RECALCULAN y reenvían un único valor
-    verificado, así que el último elemento es el que impone el proxy y no
-    puede ser falsificado por el cliente. Sin header, se cae a la IP del
-    peer directo.
+    Se usa la ÚLTIMA dirección de `X-Forwarded-For`, que el proxy confiable
+    debe recalcular. Sin header, se cae a la IP del peer directo.
     """
     forwarded = request.headers.get("X-Forwarded-For", "")
     if forwarded:

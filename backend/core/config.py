@@ -30,10 +30,6 @@ class Settings:
 
         self.backup_encryption_key: str = self._required("BACKUP_ENCRYPTION_KEY")
 
-        self.cors_allow_origins: list[str] = [
-            o.strip() for o in os.getenv("CORS_ALLOW_ORIGINS", "").split(",") if o.strip()
-        ] or ["http://localhost:8080", "http://127.0.0.1:8080"]
-
         self.web_docs_enabled: bool = os.getenv("WEB_DOCS_ENABLED", "").strip().lower() in ("1", "true", "yes", "on")
 
         try:
@@ -41,7 +37,7 @@ class Settings:
         except ValueError:
             self.pbkdf2_iterations = 600_000
 
-        # Token de acceso (JWT) corto + refresh token en cookie HttpOnly (M6).
+        # Access JWT de corta duración + refresh token rotativo para la app móvil.
         self.jwt_ttl_seconds: int = self._int_env("JWT_TTL_MINUTES", 60) * 60
         self.refresh_ttl_seconds: int = self._int_env("REFRESH_TTL_DAYS", 7) * 24 * 3600
 
@@ -66,7 +62,7 @@ class Settings:
         self.audit_retention_days: int = self._int_env("AUDIT_RETENTION_DAYS", 365)
         self.history_retention_days: int = self._int_env("HISTORY_RETENTION_DAYS", 365)
 
-        # Self-backup de la propia base del panel (SQLite cifrado + Telegram).
+        # Self-backup de la base de datos de la aplicación (SQLite cifrado + Telegram).
         self.self_backup_dir: Path = Path(os.getenv("SELF_BACKUP_DIR", str(self.backup_dir / "self")))
         self.self_backup_keep: int = self._int_env("SELF_BACKUP_KEEP_COUNT", 10)
         self.self_backup_time: str = os.getenv("SELF_BACKUP_TIME", "03:00")
@@ -77,7 +73,7 @@ class Settings:
         self.web_port: int = self._int_env("WEB_PORT", 8080)
 
         # Proxies confiados para uvicorn (proxy_headers): permite a FastAPI
-        # ver el esquema real (https) y la IP real cuando nginx/tailscale
+        # ver el esquema real (https) y la IP real cuando Tailscale Serve
         # reenvían X-Forwarded-Proto/For. Solo sufijos de red privada:
         # un cliente externo nunca puede inyectar esos headers.
         self.forwarded_allow_ips: str = os.getenv(

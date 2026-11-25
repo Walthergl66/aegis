@@ -8,6 +8,8 @@ services:
     env_file: ./backend/.env
     expose:
       - "8080"
+    ports:
+      - "127.0.0.1:8080:8080" # API privada; publicar remotamente solo por Tailscale Serve
     volumes:
       - ./data:/data                # SQLite + backups persistidos fuera del contenedor
     cap_drop:
@@ -23,28 +25,3 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
-
-  frontend:
-    build: ./frontend
-    image: supabase-backups-frontend:latest
-    container_name: supabase-backups-frontend
-    restart: unless-stopped
-    user: "1000:1000"
-    depends_on:
-      backend:
-        condition: service_healthy
-    ports:
-      - "127.0.0.1:8080:8080"           # solo loopback; el acceso remoto va por Tailscale ("tailscale serve")
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
-    read_only: true
-    tmpfs:
-      - /tmp
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080/"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
