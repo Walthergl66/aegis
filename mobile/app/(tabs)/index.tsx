@@ -11,6 +11,7 @@ import { useSession } from '@/services/session';
 export default function HomeScreen() {
   const { user, signOut, request } = useSession();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [showArchived, setShowArchived] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -18,14 +19,14 @@ export default function HomeScreen() {
     if (pull) setRefreshing(true);
     else setLoading(true);
     try {
-      setProjects(await listProjects(request));
+      setProjects(await listProjects(request, showArchived ? 'eliminados' : 'activos'));
     } catch (error) {
       Alert.alert('No se pudieron cargar los proyectos', error instanceof Error ? error.message : 'Intenta de nuevo.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [request]);
+  }, [request, showArchived]);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
@@ -54,15 +55,18 @@ export default function HomeScreen() {
         </View>
         <View style={styles.sectionRow}>
           <Text style={styles.sectionTitle}>Proyectos</Text>
-          <Pressable onPress={() => void load(true)} accessibilityRole="button"><Text style={styles.refresh}>Actualizar</Text></Pressable>
+          <View style={styles.sectionActions}>
+            {user?.rol === 'admin' && <Pressable onPress={() => setShowArchived((value) => !value)} accessibilityRole="button"><Text style={styles.refresh}>{showArchived ? 'Ver activos' : 'Archivados'}</Text></Pressable>}
+            <Pressable onPress={() => void load(true)} accessibilityRole="button"><Text style={styles.refresh}>Actualizar</Text></Pressable>
+          </View>
         </View>
         {loading ? <ActivityIndicator style={styles.loading} color="#2563eb" /> :
           <View>
-            {projects.map((project) => <ProjectCard key={project.id} project={project} canStartBackup={user?.rol === 'admin'} request={request} onCompleted={() => void load(true)} />)}
+            {projects.map((project) => <ProjectCard key={project.id} project={project} archived={showArchived} canStartBackup={user?.rol === 'admin' && !showArchived} request={request} onCompleted={() => void load(true)} />)}
             {!projects.length && <View style={styles.emptyCard}>
               <Text style={styles.emptyIcon}>▤</Text>
-              <Text style={styles.emptyTitle}>No hay proyectos activos</Text>
-              <Text style={styles.emptyText}>Cuando se conecten bases PostgreSQL, aparecerán aquí.</Text>
+              <Text style={styles.emptyTitle}>{showArchived ? 'No hay proyectos archivados' : 'No hay proyectos activos'}</Text>
+              <Text style={styles.emptyText}>{showArchived ? 'Los proyectos archivados aparecerán aquí.' : 'Cuando se conecten bases PostgreSQL, aparecerán aquí.'}</Text>
             </View>}
           </View>}
         <Text style={styles.role}>Sesión de {user?.rol}</Text>
@@ -92,6 +96,7 @@ const styles = StyleSheet.create({
   sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 30, marginBottom: 13 },
   sectionTitle: { color: '#0f172a', fontSize: 18, fontWeight: '800' },
   refresh: { color: '#2563eb', fontWeight: '700', fontSize: 13 },
+  sectionActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   loading: { marginTop: 30 },
   emptyCard: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 20, backgroundColor: '#fff', padding: 22 },
   emptyIcon: { color: '#2563eb', fontSize: 25, marginBottom: 15 },

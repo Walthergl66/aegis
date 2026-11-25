@@ -3,10 +3,10 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { getBackupJob, Project, startBackup, BackupJob } from '@/services/projects';
+import { getBackupJob, Project, restoreProject, startBackup, BackupJob } from '@/services/projects';
 import type { SessionRequest } from '@/services/session';
 
-type Props = { project: Project; canStartBackup: boolean; request: SessionRequest; onCompleted: () => void };
+type Props = { project: Project; canStartBackup: boolean; request: SessionRequest; onCompleted: () => void; archived?: boolean };
 const ACTIVE_JOB_KEY = (id: number) => 'backup.job.' + id;
 const REQUEST_KEY = (id: number) => 'backup.request.' + id;
 
@@ -20,9 +20,10 @@ function dateLabel(value?: string | null) {
   return Number.isNaN(date.valueOf()) ? value : date.toLocaleString();
 }
 
-export default function ProjectCard({ project, canStartBackup, request, onCompleted }: Props) {
+export default function ProjectCard({ project, canStartBackup, request, onCompleted, archived = false }: Props) {
   const [job, setJob] = useState<BackupJob | null>(null);
   const [starting, setStarting] = useState(false);
+  const [restoring, setRestoring] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -77,6 +78,19 @@ export default function ProjectCard({ project, canStartBackup, request, onComple
     }
   }
 
+  async function runRestore() {
+    setRestoring(true);
+    try {
+      await restoreProject(request, project.id);
+      Alert.alert('Proyecto restaurado', project.nombre + ' volvió a estar activo.');
+      onCompleted();
+    } catch (error) {
+      Alert.alert('No se pudo restaurar', error instanceof Error ? error.message : 'Intenta de nuevo.');
+    } finally {
+      setRestoring(false);
+    }
+  }
+
   const busy = starting || Boolean(job && ['queued', 'running'].includes(job.status));
   return (
     <View style={styles.card}>
@@ -94,7 +108,10 @@ export default function ProjectCard({ project, canStartBackup, request, onComple
           <View style={[styles.dot, busy && styles.activeDot]} />
           <Text style={styles.meta}>{busy ? label(job?.status) || 'Iniciando' : dateLabel(project.ultimo_backup)}</Text>
         </View>
-        {canStartBackup && <Pressable disabled={busy} onPress={() => void runBackup()} style={[styles.button, busy && styles.disabled]}>
+        {archived && <Pressable disabled={restoring} onPress={() => void runRestore()} style={[styles.button, restoring && styles.disabled]}>
+          {restoring ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.buttonText}>Restaurar</Text>}
+        </Pressable>}
+        {!archived && canStartBackup && <Pressable disabled={busy} onPress={() => void runBackup()} style={[styles.button, busy && styles.disabled]}>
           {starting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.buttonText}>{busy ? label(job?.status) || 'Iniciando' : 'Respaldar'}</Text>}
         </Pressable>}
       </View>

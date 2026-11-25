@@ -40,8 +40,8 @@ export type ProjectHistory = {
 
 export type AvailableSupabaseProject = { ref: string; name: string };
 
-export async function listProjects(request: SessionRequest) {
-  return request<Project[]>('/projects?estado=activos');
+export async function listProjects(request: SessionRequest, estado: 'activos' | 'eliminados' = 'activos') {
+  return request<Project[]>('/projects?estado=' + estado);
 }
 
 export async function testPostgresConnection(request: SessionRequest, connection: string, provider = 'postgres') {
@@ -70,6 +70,10 @@ export async function updateProject(request: SessionRequest, projectId: number, 
 
 export async function archiveProject(request: SessionRequest, projectId: number) {
   return request<{ ok: boolean }>('/projects/' + projectId, { method: 'DELETE' });
+}
+
+export async function restoreProject(request: SessionRequest, projectId: number) {
+  return request<{ ok: boolean }>('/projects/' + projectId + '/restore', { method: 'POST', body: JSON.stringify({}) });
 }
 
 export async function fetchSupabaseProjects(request: SessionRequest, pat: string) {
