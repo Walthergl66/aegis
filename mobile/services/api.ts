@@ -21,7 +21,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, accessToken?: string): Promise<T> {
   if (!API_URL) {
     throw new ApiError('Configura EXPO_PUBLIC_API_URL en mobile/.env.local.', 0);
   }
@@ -30,7 +30,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     response = await fetch(`${API_URL}${path}`, {
       ...init,
-      headers: { 'Content-Type': 'application/json', ...init?.headers },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        ...init?.headers,
+      },
     });
   } catch {
     throw new ApiError('No se pudo conectar con el servidor. Revisa la red y la URL de API.', 0);
@@ -64,4 +68,20 @@ export const api = {
       headers: { Authorization: `Bearer ${accessToken}` },
       body: JSON.stringify({ refresh_token: refreshToken }),
     }),
+  authenticated: async <T,>(
+    path: string,
+    init: RequestInit,
+    accessToken: string,
+    refreshToken: string,
+    onRefresh: (tokens: SessionTokens) => Promise<void>,
+  ): Promise<T> => {
+    try {
+      return await request<T>(path, init, accessToken);
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 401 || !refreshToken) throw error;
+      const tokens = await api.refresh(refreshToken);
+      await onRefresh(tokens);
+      return request<T>(path, init, tokens.access_token);
+    }
+  },
 };

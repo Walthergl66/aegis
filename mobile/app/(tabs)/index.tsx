@@ -1,15 +1,37 @@
 import { StatusBar } from 'expo-status-bar';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import ProjectCard from '@/components/ProjectCard';
+import { listProjects, Project } from '@/services/projects';
 import { useSession } from '@/services/session';
 
 export default function HomeScreen() {
-  const { user, signOut } = useSession();
+  const { user, signOut, request } = useSession();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = useCallback(async (pull = false) => {
+    if (pull) setRefreshing(true);
+    else setLoading(true);
+    try {
+      setProjects(await listProjects(request));
+    } catch (error) {
+      Alert.alert('No se pudieron cargar los proyectos', error instanceof Error ? error.message : 'Intenta de nuevo.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [request]);
+
+  useEffect(() => { void load(); }, [load]);
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar style="dark" />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />}>
         <View style={styles.topRow}>
           <View>
             <Text style={styles.kicker}>BACKUPS POSTGRESQL</Text>
@@ -23,14 +45,21 @@ export default function HomeScreen() {
           <View style={styles.statusDot} />
           <Text style={styles.heroLabel}>SERVICIO</Text>
           <Text style={styles.heroTitle}>Conectado y listo</Text>
-          <Text style={styles.heroText}>Tu sesión está protegida y puedes administrar tus copias desde aquí.</Text>
+          <Text style={styles.heroText}>{projects.length} {projects.length === 1 ? 'proyecto conectado' : 'proyectos conectados'} a tu espacio.</Text>
         </View>
-        <Text style={styles.sectionTitle}>Tu espacio de trabajo</Text>
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyIcon}>▤</Text>
-          <Text style={styles.emptyTitle}>Tus proyectos estarán aquí</Text>
-          <Text style={styles.emptyText}>En la siguiente etapa conectaremos esta app con tus proyectos PostgreSQL y el historial de copias.</Text>
+        <View style={styles.sectionRow}>
+          <Text style={styles.sectionTitle}>Proyectos</Text>
+          <Pressable onPress={() => void load(true)} accessibilityRole="button"><Text style={styles.refresh}>Actualizar</Text></Pressable>
         </View>
+        {loading ? <ActivityIndicator style={styles.loading} color="#2563eb" /> :
+          <View>
+            {projects.map((project) => <ProjectCard key={project.id} project={project} canStartBackup={user?.rol === 'admin'} request={request} onCompleted={() => void load(true)} />)}
+            {!projects.length && <View style={styles.emptyCard}>
+              <Text style={styles.emptyIcon}>▤</Text>
+              <Text style={styles.emptyTitle}>No hay proyectos activos</Text>
+              <Text style={styles.emptyText}>Cuando se conecten bases PostgreSQL, aparecerán aquí.</Text>
+            </View>}
+          </View>}
         <Text style={styles.role}>Sesión de {user?.rol}</Text>
       </ScrollView>
     </SafeAreaView>
@@ -50,7 +79,10 @@ const styles = StyleSheet.create({
   heroLabel: { color: '#94a3b8', letterSpacing: 1.3, fontWeight: '800', fontSize: 10 },
   heroTitle: { color: '#fff', fontSize: 22, fontWeight: '800', marginTop: 6 },
   heroText: { color: '#cbd5e1', fontSize: 14, lineHeight: 21, marginTop: 7, maxWidth: 300 },
-  sectionTitle: { color: '#0f172a', fontSize: 18, fontWeight: '800', marginTop: 30, marginBottom: 13 },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 30, marginBottom: 13 },
+  sectionTitle: { color: '#0f172a', fontSize: 18, fontWeight: '800' },
+  refresh: { color: '#2563eb', fontWeight: '700', fontSize: 13 },
+  loading: { marginTop: 30 },
   emptyCard: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 20, backgroundColor: '#fff', padding: 22 },
   emptyIcon: { color: '#2563eb', fontSize: 25, marginBottom: 15 },
   emptyTitle: { color: '#0f172a', fontSize: 16, fontWeight: '800' },

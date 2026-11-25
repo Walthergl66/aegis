@@ -1,10 +1,11 @@
 import * as SecureStore from 'expo-secure-store';
-import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import { api, MobileUser, SessionTokens } from './api';
+import { ApiError, api, MobileUser, SessionTokens } from './api';
 
 const ACCESS_KEY = 'session.access';
 const REFRESH_KEY = 'session.refresh';
+export type SessionRequest = <T,>(path: string, init?: RequestInit) => Promise<T>;
 
 type SessionContextValue = {
   ready: boolean;
@@ -12,6 +13,7 @@ type SessionContextValue = {
   accessToken: string | null;
   signIn: (tokens: SessionTokens) => Promise<void>;
   signOut: () => Promise<void>;
+  request: <T,>(path: string, init?: RequestInit) => Promise<T>;
 };
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -43,23 +45,23 @@ export function SessionProvider({ children }: PropsWithChildren) {
     return () => { active = false; };
   }, []);
 
-  async function persist(tokens: SessionTokens) {
+  const persist = useCallback(async (tokens: SessionTokens) => {
     await SecureStore.setItemAsync(ACCESS_KEY, tokens.access_token);
     await SecureStore.setItemAsync(REFRESH_KEY, tokens.refresh_token);
-  }
+  }, []);
 
-  async function clearStoredSession() {
+  const clearStoredSession = useCallback(async () => {
     await SecureStore.deleteItemAsync(ACCESS_KEY);
     await SecureStore.deleteItemAsync(REFRESH_KEY);
-  }
+  }, []);
 
-  async function signIn(tokens: SessionTokens) {
+  const signIn = useCallback(async (tokens: SessionTokens) => {
     await persist(tokens);
     setUser(tokens.user);
     setAccessToken(tokens.access_token);
-  }
+  }, [persist]);
 
-  async function signOut() {
+  const signOut = useCallback(async () => {
     const refreshToken = await SecureStore.getItemAsync(REFRESH_KEY);
     try {
       if (refreshToken && accessToken) await api.logout(refreshToken, accessToken);
@@ -69,9 +71,28 @@ export function SessionProvider({ children }: PropsWithChildren) {
     await clearStoredSession();
     setUser(null);
     setAccessToken(null);
-  }
+  }, [accessToken, clearStoredSession]);
 
-  const value = useMemo(() => ({ ready, user, accessToken, signIn, signOut }), [ready, user, accessToken]);
+  const request = useCallback(async <T,>(path: string, init: RequestInit = {}) => {
+    const refreshToken = await SecureStore.getItemAsync(REFRESH_KEY);
+    if (!accessToken || !refreshToken) throw new Error('La sesión expiró. Inicia sesión nuevamente.');
+    try {
+      return await api.authenticated<T>(path, init, accessToken, refreshToken, async (tokens) => {
+        await persist(tokens);
+        setAccessToken(tokens.access_token);
+        setUser(tokens.user);
+      });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        await clearStoredSession();
+        setAccessToken(null);
+        setUser(null);
+      }
+      throw error;
+    }
+  }, [accessToken, clearStoredSession, persist]);
+
+  const value = useMemo(() => ({ ready, user, accessToken, signIn, signOut, request }), [ready, user, accessToken, signIn, signOut, request]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 
