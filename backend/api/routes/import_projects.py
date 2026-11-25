@@ -1,4 +1,4 @@
-"""API de importación de proyectos desde Supabase (con usuario de Telegram)."""
+"""API de importación de proyectos Supabase desde web y app móvil."""
 
 from __future__ import annotations
 
@@ -50,6 +50,7 @@ async def create_imported_projects(request: Request, admin: dict = Depends(requi
     account_name = (data.get("account_name") or "").strip()
     tg_nombre = (data.get("telegram_nombre") or "").strip()
     tg_rol = data.get("telegram_rol") or "usuario"
+    native_client = data.get("client_type") == "native"
     db_password = (data.get("db_password") or "").strip() or None
     pooler_mode = (data.get("pooler_mode") or "session").strip().lower()
     test_connection = bool(data.get("test_connection"))
@@ -66,7 +67,7 @@ async def create_imported_projects(request: Request, admin: dict = Depends(requi
         raise HTTPException(status_code=400, detail="Debes ingresar un PAT.")
     if not selected:
         raise HTTPException(status_code=400, detail="Debes seleccionar al menos un proyecto.")
-    if not tg_nombre or not tg_chat:
+    if not native_client and (not tg_nombre or not tg_chat):
         raise HTTPException(status_code=400,
                             detail="Debes ingresar el nombre y el chat_id del usuario de Telegram.")
 
@@ -123,7 +124,7 @@ async def create_imported_projects(request: Request, admin: dict = Depends(requi
             errors.append(f"{project_data['name']}: {exc}")
 
     telegram_user = None
-    if created_ids:
+    if created_ids and not native_client:
         try:
             existing = users_srv.get_user(tg_chat)
             if existing:
@@ -151,8 +152,10 @@ async def create_imported_projects(request: Request, admin: dict = Depends(requi
             errors.append(f"Usuario de Telegram: {exc}")
 
     audit_srv.log_action(
-        "web_importar_proyectos", "ok", web_user_id=admin["id"],
-        detalle=f"{created} proyectos importados, {len(errors)} errores, chat {tg_chat}",
+        "mobile_import_supabase" if native_client else "web_importar_proyectos",
+        "ok", web_user_id=admin["id"],
+        detalle=f"{created} proyectos importados, {len(errors)} errores, "
+                + (f"cliente nativo, cuenta {account_name}" if native_client else f"chat {tg_chat}"),
     )
     return {
         "created": created,
