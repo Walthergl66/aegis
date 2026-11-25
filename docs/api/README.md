@@ -15,8 +15,8 @@ La API es JSON bajo `/api/*`. Las rutas salvo salud y login requieren `Authoriza
 | `GET /api/dashboard` | Sesión | Conteos, proyectos activos y auditoría reciente. |
 | `/api/accounts` | Admin | `GET`, `POST`, `GET/{id}`, `PUT/{id}`, `DELETE/{id}` para cuentas Supabase o grupos PostgreSQL directo. |
 | `GET /api/projects?estado=activos&provider=postgres` | Sesión (estados no activos solo admin) | Lista proyectos; `provider` filtra opcionalmente por `postgres` o `supabase`. |
-| `/api/projects` | Mixto | Listado/detalle/historial autenticado; alta, edición, baja y restauración admin. Incluye `GET /active`. |
-| `POST /api/projects/test-connection` | Admin | Prueba una URI antes de guardarla; JSON `connection` y `provider` opcional (`postgres` por defecto). Devuelve `ok`, detalle, host, base, versión y latencia. |
+| `/api/projects` | Mixto | Listado/detalle/historial autenticado; alta, edición, baja y restauración admin. Incluye `GET /active`. El cliente móvil usa `POST` para crear conexiones PostgreSQL y `PUT /{id}` para editar nombre, URI opcional, cron, estado y opciones PostgreSQL; el servidor cifra la URI y deriva el slug al crear si se omite. `DELETE /{id}` archiva lógicamente y conserva historial. |
+| `POST /api/projects/test-connection` | Admin | Prueba una URI; JSON `connection` y `provider` opcional (`postgres` por defecto). Devuelve `ok`, detalle, host, base, versión y latencia. La prueba es independiente del alta y no es requisito para guardar. |
 | `POST /api/projects/{id}/restore` | Admin | Restaura proyecto archivado con el slug enviado. |
 | `GET /api/projects/{id}/history` | Sesión | Proyecto, resumen y las 25 entradas recientes de su historial. |
 | `/api/import/fetch`, `/api/import/create` | Admin | Consulta Management API y registra proyectos seleccionados. |
