@@ -25,6 +25,7 @@ from services import web_users as web_users_srv
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 _REFRESH_COOKIE = "sb_refresh_token"
+_NATIVE_CLIENT = "native"
 
 
 def _qr_svg_data_uri(content: str) -> str:
@@ -117,16 +118,18 @@ async def login(request: Request):
 
     web_users_srv.reset_failed_logins(username, ip)
     token = create_token(user)
-    response = JSONResponse(
-        {
+    native_client = data.get("client_type") == _NATIVE_CLIENT
+    payload = {
             "access_token": token,
             "expires_in": settings().jwt_ttl_seconds,
             "token_type": "bearer",
             "user": {"id": user["id"], "username": user["username"], "rol": user["rol"],
                      "totp_enabled": bool(user.get("totp_enabled"))},
         }
-    )
     refresh = refresh_tokens.refresh_store.create(user)
+    if native_client:
+        payload["refresh_token"] = refresh
+    response = JSONResponse(payload)
     response.set_cookie(
         _REFRESH_COOKIE, refresh, max_age=settings().refresh_ttl_seconds, **_cookie_kwargs(request)
     )
@@ -143,8 +146,12 @@ async def me(user: dict = Depends(get_current_user)) -> dict:
 
 @router.post("/refresh")
 async def refresh_token(request: Request):
-    """Renueva el access token usando el refresh token de la cookie y rota la cookie."""
-    raw = request.cookies.get(_REFRESH_COOKIE)
+    """Renueva el access token con cookie web o token opaco del cliente nativo."""
+    try:
+        data = await request.json()
+    except Exception:  # noqa: BLE001
+        data = {}
+    raw = request.cookies.get(_REFRESH_COOKIE) or data.get("refresh_token")
     rotated = refresh_tokens.refresh_store.validate_and_rotate(raw) if raw else None
     if rotated is None:
         return JSONResponse({"detail": "Sesión expirada."}, status_code=401)
@@ -162,15 +169,17 @@ async def refresh_token(request: Request):
         "totp_enabled": bool(raw_user.get("totp_enabled")),
     }
     token = create_token(user)
-    response = JSONResponse(
-        {
+    native_client = bool(data.get("refresh_token"))
+    payload = {
             "access_token": token,
             "expires_in": settings().jwt_ttl_seconds,
             "token_type": "bearer",
             "user": {"id": user["id"], "username": user["username"], "rol": user["rol"],
                      "totp_enabled": bool(user.get("totp_enabled"))},
         }
-    )
+    if native_client:
+        payload["refresh_token"] = new_refresh
+    response = JSONResponse(payload)
     response.set_cookie(
         _REFRESH_COOKIE, new_refresh, max_age=settings().refresh_ttl_seconds, **_cookie_kwargs(request)
     )
@@ -234,6 +243,11 @@ async def totp_disable(request: Request, user: dict = Depends(get_current_user))
 @router.post("/logout")
 async def logout(request: Request):
     raw = request.cookies.get(_REFRESH_COOKIE)
+    try:
+        data = await request.json()
+    except Exception:  # noqa: BLE001
+        data = {}
+    raw = raw or data.get("refresh_token")
     if raw:
         refresh_tokens.refresh_store.revoke(raw)
     # Invalida también el access token presente (si lo hay) en el header.
