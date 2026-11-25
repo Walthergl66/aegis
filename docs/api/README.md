@@ -23,6 +23,7 @@ La API es JSON bajo `/api/*`. Las rutas salvo salud y login requieren `Authoriza
 | `/api/users` | Admin | CRUD de usuarios Telegram y `POST /{id}/permissions`. |
 | `/api/web-users` | Admin | CRUD de usuarios del panel. |
 | `GET /api/backups` | Sesión | Historial paginado de backups; rutas devueltas relativas a BACKUP_DIR. |
+| `GET /api/backups/{backup_id}/download?format=dump|sql` | Admin | Descarga por streaming un artefacto cifrado asociado a un backup correcto. Solo acepta `dump` o `sql`. |
 | `POST /api/projects/{id}/backup-jobs` | Admin | Encola un backup y responde `202`; requiere `Idempotency-Key`. Repetir la clave del mismo usuario devuelve el trabajo existente. |
 | `GET /api/backups/jobs/{job_id}` | Sesión | Consulta estado persistente del trabajo en cola, ejecución, completado, fallo o interrupción. |
 | `GET /api/audit` | Sesión | Bitácora paginada. |
