@@ -2,7 +2,13 @@
 
 **Objetivo de producto.** Una persona autorizada puede registrar una base PostgreSQL, probar la conexión, programar o iniciar una copia, cerrar la app y volver para consultar el resultado o recuperar el archivo. Una cuenta Supabase añade descubrimiento de proyectos por PAT y estado del servicio. El mismo motor PostgreSQL respalda ambos tipos de conexión.
 
-**Cliente móvil.** La aplicación móvil será nativa y multiplataforma, desarrollada con Expo y React Native bajo `mobile/`. El frontend PWA existente continuará como interfaz web administrativa. La app nativa usará la misma API REST y guardará tokens en el almacén seguro de Android/iOS.
+**Cliente móvil.** La aplicación móvil objetivo es nativa y multiplataforma, desarrollada con Expo y React Native bajo `mobile/`. El frontend PWA existente continúa como interfaz web administrativa, no como sustituto del cliente móvil. La app nativa usa la misma API REST y guarda tokens en el almacén seguro de Android/iOS. El estado y guía del scaffold están en [App móvil](../movil/README.md).
+
+## Estado actual del plan
+
+La base de la **Fase 1** está implementada: scaffold Expo/React Native, configuración Android/iOS, navegación protegida, login con usuario/contraseña y paso TOTP, sesión nativa con tokens en SecureStore y contrato de refresh/logout nativo. La configuración y los bundles de Android e iOS fueron verificados en este corte.
+
+La app aún es un scaffold de autenticación: Inicio muestra un espacio de proyectos pendiente. No hay todavía pantallas móviles para proyectos, ejecución/seguimiento de backups, historial, descarga, administración ni notificaciones push. La verificación de bundles no equivale a validar instalación y operación en dispositivos físicos ni a preparar builds de distribución. Por ello, los criterios de salida completos de la Fase 1 y el piloto siguen pendientes; el resto de fases conserva el alcance descrito más abajo.
 
 **Punto de partida.** FastAPI, el bot y APScheduler comparten un proceso. Ya existen sesiones con TOTP, proyectos, proveedores, prueba de conexión, historial, cifrado, rotación y copia S3. La ruta web de backups lista ejecuciones. El disparo manual, la entrega de archivos y varias alertas dependen del bot. El arranque exige `BOT_TOKEN`. Las rutas y tablas nuevas que aparecen más abajo son propuestas. Véanse la [arquitectura](../arquitectura/README.md), la [API](../api/README.md) y el [inventario del bot](../bot/README.md).
 
