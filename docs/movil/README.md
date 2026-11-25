@@ -1,6 +1,6 @@
 # Aplicación móvil nativa
 
-`mobile/` es el cliente nativo Expo/React Native para Android e iOS. Comparte la API REST y las cuentas web existentes con el panel. La PWA de `frontend/` sigue siendo la interfaz web administrativa; no es el cliente móvil objetivo ni contiene las rutas nativas.
+`mobile/` es el cliente nativo Expo/React Native para Android e iOS y el único cliente final previsto. Comparte la API REST y la identidad que hoy todavía se denomina web. El frontend de `frontend/` es transitorio durante la migración; no añadirle nuevas funciones y retirarlo al completar la administración, alertas y validación móvil.
 
 ## Estado actual
 
@@ -20,7 +20,7 @@ La app ya cubre una primera ruta operativa:
 - El detalle del proyecto consume su historial y muestra las 25 entradas más recientes. Permite descargar un dump con la sesión vigente, guardarlo temporalmente en la caché y compartirlo con la hoja nativa; elimina el archivo temporal después.
 - Configuración Expo con plataformas Android e iOS y bundles de ambas plataformas verificados para este corte.
 
-La importación Supabase móvil reutiliza el flujo y los servicios de Supabase existentes en el backend; no agrega una implementación separada de Management API. En modo nativo no requiere ni crea un usuario Telegram. Quedan pendientes las pruebas en dispositivos físicos, y validar PAT vencidos/sin permisos, contraseña de base ausente o incorrecta, disponibilidad de Supabase y resultados parciales de importación. La app no incluye administración de usuarios/permisos ni push. El cron se edita como expresión de cinco campos, sin selector de zona horaria ni vista previa de próxima ejecución. La verificación de configuración y bundles no demuestra una prueba en dispositivos físicos ni constituye una build de distribución.
+La importación Supabase móvil reutiliza el flujo y los servicios de Supabase existentes en el backend; no agrega una implementación separada de Management API. En modo nativo no requiere ni crea un usuario Telegram. Quedan pendientes las pruebas en dispositivos físicos, y validar PAT vencidos/sin permisos, contraseña de base ausente o incorrecta, disponibilidad de Supabase y resultados parciales de importación. La app aún no incluye administración de cuentas/usuarios/permisos ni push. El cron se edita como expresión de cinco campos, sin selector de zona horaria ni vista previa de próxima ejecución. Mientras se completan esas funciones, el panel web sigue desplegado solo como transición y no es parte del producto final. La verificación de configuración y bundles no demuestra una prueba en dispositivos físicos ni constituye una build de distribución.
 
 ## Configuración y arranque local
 
@@ -72,7 +72,7 @@ El adaptador móvil llama a estas rutas relativas a `EXPO_PUBLIC_API_URL`:
 2. `POST /auth/refresh` envía `{ "refresh_token": "…" }`. El servidor rota el refresh token y devuelve ambos tokens nuevos para persistirlos.
 3. `POST /auth/logout` envía el refresh token en el cuerpo y el access token como Bearer para revocar ambos.
 
-El servidor sigue emitiendo/aceptando `sb_refresh_token` como cookie HttpOnly para el panel web. El cliente nativo usa los tokens del cuerpo y SecureStore; no reemplaza el flujo de cookies de la PWA.
+El servidor sigue emitiendo/aceptando `sb_refresh_token` como cookie HttpOnly para la interfaz web transitoria. El cliente nativo usa los tokens del cuerpo y SecureStore. La cookie se podrá retirar junto con el panel cuando la validación móvil y la migración de sesiones estén aprobadas.
 
 ## Proyectos y trabajos de backup
 
@@ -93,4 +93,4 @@ El servidor sigue emitiendo/aceptando `sb_refresh_token` como cookie HttpOnly pa
 
 ## Próxima fase
 
-El orden del trabajo, los criterios de salida y los flujos de producto pendientes están en el [plan de implementación móvil](../implementacion/implementacion.md). Lo siguiente es completar la cobertura y validación física de Supabase, dar una experiencia más completa a cron y permisos/administración, añadir push y validar los flujos en dispositivos físicos.
+El orden del trabajo, los criterios de salida y la retirada de la interfaz web y Telegram están en el [plan de implementación móvil](../implementacion/implementacion.md). Lo siguiente es portar administración de cuentas/usuarios/permisos, añadir push, validar en dispositivos físicos y retirar el panel web al alcanzar paridad.
