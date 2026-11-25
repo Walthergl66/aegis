@@ -33,7 +33,7 @@
 
 ## 4. Exponer la ejecución de backups como trabajo persistente
 
-- Añadir como contrato propuesto `POST /api/projects/{id}/backup-jobs` y `GET /api/backup-jobs/{id}`. Responder al alta con HTTP 202 y un identificador. Registrar en SQLite el actor, origen manual o cron, proyecto, tiempos, estado y resultado asociado.
+- El primer corte ya expone `POST /api/projects/{id}/backup-jobs` y `GET /api/backups/jobs/{job_id}`. El alta devuelve HTTP 202 y un identificador, exige `Idempotency-Key` y requiere admin. SQLite conserva usuario, proyecto, clave, estado, tiempos y resultado. Por ahora el worker procesa solicitudes web manuales; ampliar los jobs a cron y permisos más granulares sigue pendiente.
 - Reutilizar el runner desde bot, scheduler y API durante la transición. Procesar trabajos dentro del backend existente, con límite global y exclusión por proyecto. Una clave de idempotencia debe devolver el mismo trabajo si el móvil repite la petición tras perder la red.
 - Definir estados en cola, en ejecución, completado, fallido e interrumpido. Al reiniciar, reconciliar trabajos en curso con los artefactos y recuperar la cola. Registrar por separado el resultado local y la transferencia S3 para que un fallo remoto pueda reintentarse sin repetir el volcado.
 - Permitir descarga autenticada por identificador de artefacto. Verificar permiso y existencia en cada entrega, registrar quién descarga y distinguir copia rotada de error de red. Mantener la exportación de SQLite del panel restringida a administradores.
