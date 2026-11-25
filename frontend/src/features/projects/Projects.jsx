@@ -133,9 +133,12 @@ export default function Projects() {
 
   const startBackup = async (project) => {
     setStartingBackup(project.id)
+    const requestKey = `sb_backup_request_${project.id}`
     try {
-      const key = crypto.randomUUID()
+      const key = localStorage.getItem(requestKey) || crypto.randomUUID()
+      localStorage.setItem(requestKey, key)
       const job = await enqueueBackup(project.id, key)
+      localStorage.removeItem(requestKey)
       localStorage.setItem(`sb_backup_job_${project.id}`, job.id)
       completedJobs.current.delete(job.id)
       setBackupJobs((current) => ({ ...current, [project.id]: job }))
