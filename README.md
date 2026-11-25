@@ -1,6 +1,6 @@
 # Bot de Backups y Monitoreo de PostgreSQL
 
-Panel web progresivo y bot de Telegram para administrar bases PostgreSQL y ejecutar backups bajo demanda o programados. Se puede conectar cualquier PostgreSQL accesible por URI; Supabase es opcional y añade importación por PAT y consulta del estado cloud. El motor de copias siempre usa `pg_dump`.
+Sistema para administrar bases PostgreSQL y ejecutar backups bajo demanda o programados, con una app móvil nativa Android/iOS en desarrollo, un panel web instalable (PWA) y un bot de Telegram. La PWA sigue siendo la interfaz web administrativa; la app Expo/React Native es el cliente móvil objetivo. Se puede conectar cualquier PostgreSQL accesible por URI; Supabase añade opcionalmente importación por PAT y consulta del estado cloud. El motor de copias siempre usa `pg_dump`.
 
 El sistema integra FastAPI, React/Vite, SQLite, `pg_dump`/`pg_restore` y APScheduler en un despliegue Docker de dos contenedores. API, bot y trabajos programados comparten un único proceso backend.
 
@@ -14,7 +14,7 @@ Los proyectos PostgreSQL directos permiten probar la conexión antes de guardarl
 
 El bot incluye `/test <slug>`, además de `/proyectos`, `/backup <slug>`, `/status <slug>` y `/historial <slug>`.
 
-La guía completa de puesta en marcha local y operación está en [Instalación y operación](docs/operacion/README.md). Para el despliegue privado por Tailscale consulta el [runbook Modelo A](docs/despliegue/README.md).
+La guía para desarrollar la app nativa está en [App móvil](docs/movil/README.md); el plan por fases está en [Implementación móvil](docs/implementacion/implementacion.md). La puesta en marcha del backend/panel está en [Instalación y operación](docs/operacion/README.md), y el despliegue privado en [Modelo A](docs/despliegue/README.md).
 
 ## Documentación del proyecto
 
@@ -28,6 +28,7 @@ El índice [Documentación modular](docs/README.md) organiza la guía por domini
 - `backend/core/`: configuración, SQLite, cifrado, JWT, seguridad y sanitización.
 - `backend/backup/`, `bot/`, `notify/`: ejecución y programación de copias, comandos Telegram y notificaciones.
 - `frontend/src/`: SPA React/PWA, funciones por dominio y clientes de API.
+- `mobile/`: cliente nativo Expo/React Native para Android e iOS; actualmente incluye login/sesión y una pantalla inicial protegida.
 - `backend/db/schema.sql`: esquema de base nueva; `backend/core/db.py` aplica migraciones incrementales.
 - `data/`: persistencia local de SQLite y archivos de backup; no se versiona.
 
@@ -46,6 +47,11 @@ cd ../frontend
 npm install
 npm run dev
 npm run build
+
+cd ../mobile
+npm install
+# Configura mobile/.env.local desde mobile/.env.example
+npm run start
 ```
 
 La configuración detallada, los límites operativos y los pasos para recuperar backups están documentados en [`docs/`](docs/README.md). Nunca subas `backend/.env`, `data/` ni claves de cifrado al repositorio.
