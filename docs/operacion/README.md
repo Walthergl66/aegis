@@ -5,7 +5,7 @@
 - Docker y Docker Compose (ruta recomendada).
 - Bot creado con BotFather y token.
 - Para importar Supabase: PAT con permisos necesarios, referencias de proyecto y contraseña de PostgreSQL.
-- En ejecución fuera de Docker: Python compatible con dependencias y `pg_dump`/`pg_restore` disponibles en PATH.
+- En ejecución fuera de Docker: Python compatible con dependencias y `pg_dump`, `pg_restore` y `psql` disponibles en PATH. El contenedor instala `postgresql-client-18` desde PGDG.
 
 ## Docker
 
@@ -51,9 +51,9 @@ docker compose up -d --build
 
 ## Importación y uso
 
-1. Crea/importa una cuenta y proyecto.
+1. Para PostgreSQL directo, crea un proyecto con una URI y valida la conexión; se crea/usa el grupo **Conexiones directas**. Para Supabase, importa con un PAT.
 2. Registra el usuario Telegram que ejecutará comandos y asigna `can_backup`/`can_monitor` si no es admin.
-3. Ejecuta `/proyectos`, `/status <slug>`, `/backup <slug>` o `/historial <slug>`.
+3. Ejecuta `/proyectos`, `/test <slug>`, `/status <slug>`, `/backup <slug>` o `/historial <slug>`.
 4. Opcional: define cron de cinco campos para cada proyecto activo.
 5. Revisa resultados en Backups, historial por proyecto y Bitácora.
 
