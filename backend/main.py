@@ -26,6 +26,7 @@ from backup import cleanup as cleanup_mod
 from backup import offsite as offsite_mod
 from backup import scheduler_jobs
 from backup import self_backup as self_backup_mod
+from backup import web_jobs
 from bot import build_application, run_bot_forever
 from core import db as db_core
 from core.config import settings
@@ -290,13 +291,20 @@ async def main() -> None:
     scheduler = setup_scheduler(log)
     scheduler_jobs.bind(scheduler)
     scheduler_jobs.resync()
+    db_core.execute("UPDATE backup_jobs SET status = 'interrupted', finished_at = datetime('now'), detail = 'El proceso terminó durante la ejecución.' WHERE status = 'running'")
+    backup_jobs_task = asyncio.create_task(web_jobs.run_forever())
     bot_task = asyncio.create_task(run_bot_forever(bot_app))
     log.info("Interfaz web expuesta en http://%s:%s", cfg.web_host, cfg.web_port)
     try:
         await server.serve()
     finally:
         scheduler.shutdown(wait=False)
+        backup_jobs_task.cancel()
         bot_task.cancel()
+        try:
+            await backup_jobs_task
+        except asyncio.CancelledError:
+            pass
         try:
             await bot_task
         except asyncio.CancelledError:

@@ -11,10 +11,28 @@ from api.parse import as_bool
 from backup import scheduler_jobs
 from services import audit as audit_srv
 from services import backup_history as history_srv
+from services import backup_jobs as jobs_srv
 from services import projects as projects_srv
 from services import providers
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
+
+
+@router.post("/{project_id}/backup-jobs", status_code=202)
+async def enqueue_backup(project_id: int, request: Request, admin: dict = Depends(require_admin)):
+    project = projects_srv.get_project(project_id)
+    if project is None or not project["activo"]:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado.")
+    key = request.headers.get("Idempotency-Key", "").strip()
+    if not key or len(key) > 200:
+        raise HTTPException(status_code=400, detail="Envía una cabecera Idempotency-Key válida.")
+    try:
+        job = jobs_srv.create(project_id, admin["id"], key)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    audit_srv.log_action("web_backup_solicitado", "ok", web_user_id=admin["id"],
+                         project_id=project_id, detalle=f"job={job['id']}")
+    return job
 
 
 @router.get("")

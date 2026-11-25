@@ -74,6 +74,21 @@ def _migrate() -> None:
             expires_at INTEGER NOT NULL
         )
         """,
+        """
+        CREATE TABLE IF NOT EXISTS backup_jobs (
+            id              TEXT PRIMARY KEY,
+            project_id      INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+            requested_by    INTEGER REFERENCES web_users(id) ON DELETE SET NULL,
+            idempotency_key TEXT NOT NULL,
+            status          TEXT NOT NULL,
+            created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+            started_at      TEXT,
+            finished_at     TEXT,
+            history_id      INTEGER REFERENCES backup_history(id) ON DELETE SET NULL,
+            detail          TEXT,
+            UNIQUE (requested_by, idempotency_key)
+        )
+        """,
     ]
     with connect() as conn:
         for statement in statements:
@@ -94,6 +109,10 @@ def _migrate() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_access_token_revocations_expiry "
             "ON access_token_revocations (expires_at)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_backup_jobs_queue "
+            "ON backup_jobs (status, created_at)"
         )
         _ensure_default_group(conn)
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")

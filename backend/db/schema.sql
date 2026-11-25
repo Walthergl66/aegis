@@ -131,6 +131,23 @@ CREATE TABLE access_token_revocations (
     expires_at INTEGER NOT NULL
 );
 
+CREATE TABLE backup_jobs (
+    id              TEXT PRIMARY KEY,
+    project_id      INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    requested_by    INTEGER REFERENCES web_users(id) ON DELETE SET NULL,
+    idempotency_key TEXT NOT NULL,
+    status          TEXT NOT NULL,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    started_at      TEXT,
+    finished_at     TEXT,
+    history_id      INTEGER REFERENCES backup_history(id) ON DELETE SET NULL,
+    detail          TEXT,
+    UNIQUE (requested_by, idempotency_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_backup_jobs_queue
+    ON backup_jobs (status, created_at);
+
 CREATE INDEX IF NOT EXISTS idx_backup_history_project
     ON backup_history (project_id, fecha DESC);
 

@@ -4,13 +4,22 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.deps import get_current_user
 from core import db
 from core.config import settings
+from services import backup_jobs as jobs_srv
 
 router = APIRouter(prefix="/api/backups", tags=["backups"])
+
+
+@router.get("/jobs/{job_id}")
+async def get_backup_job(job_id: str, user: dict = Depends(get_current_user)):
+    job = jobs_srv.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Trabajo de backup no encontrado.")
+    return job
 
 
 def _relative_ruta(ruta: str | None) -> str | None:
