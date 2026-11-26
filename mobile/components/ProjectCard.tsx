@@ -119,9 +119,9 @@ export default function ProjectCard({ project, canStartBackup, request, onComple
 }
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: '#fff', borderRadius: 18, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#e2e8f0' },
+  card: { backgroundColor: '#fff', borderRadius: 20, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#e8edf5', shadowColor: '#0f172a', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
   head: { flexDirection: 'row', alignItems: 'center' },
-  glyph: { width: 42, height: 42, borderRadius: 13, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center' },
+  glyph: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center' },
   glyphText: { color: '#2563eb', fontSize: 12, fontWeight: '900' },
   identity: { flex: 1, marginLeft: 12 },
   name: { color: '#0f172a', fontSize: 15, fontWeight: '800' },
@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
   status: { flex: 1, flexDirection: 'row', alignItems: 'center', paddingRight: 8 },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#16a34a', marginRight: 8 },
   activeDot: { backgroundColor: '#f59e0b' },
-  button: { minWidth: 94, minHeight: 36, paddingHorizontal: 12, borderRadius: 11, backgroundColor: '#1d4ed8', alignItems: 'center', justifyContent: 'center' },
+  button: { minWidth: 94, minHeight: 36, paddingHorizontal: 14, borderRadius: 12, backgroundColor: '#2563eb', alignItems: 'center', justifyContent: 'center' },
   disabled: { opacity: 0.65 },
   buttonText: { color: '#fff', fontWeight: '700', fontSize: 12 },
 });
