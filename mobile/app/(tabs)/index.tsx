@@ -37,7 +37,7 @@ export default function HomeScreen() {
         <View style={styles.topRow}>
           <View>
             <Text style={styles.kicker}>BACKUPS POSTGRESQL</Text>
-            <Text style={styles.title}>Hola, {user?.username}</Text>
+            <Text style={styles.title}>Hola, {user?.username} 👋</Text>
           </View>
           <View style={styles.topActions}>
             {user?.rol === 'admin' && <Pressable accessibilityRole="button" onPress={() => router.push('/projects/new')} style={styles.addButton}><Text style={styles.addText}>+</Text></Pressable>}
@@ -50,8 +50,8 @@ export default function HomeScreen() {
         <View style={styles.hero}>
           <View style={styles.statusDot} />
           <Text style={styles.heroLabel}>SERVICIO</Text>
-          <Text style={styles.heroTitle}>Conectado y listo</Text>
-          <Text style={styles.heroText}>{projects.length} {projects.length === 1 ? 'proyecto conectado' : 'proyectos conectados'} a tu espacio.</Text>
+          <Text style={styles.heroTitle}>Todo en orden</Text>
+          <Text style={styles.heroText}>{projects.length === 0 ? 'Aún no tienes proyectos. Cuando agregues uno, lo verás aquí.' : `${projects.length} ${projects.length === 1 ? 'proyecto listo para cuidar' : 'proyectos listos para cuidar'}.`}</Text>
         </View>
         <View style={styles.sectionRow}>
           <Text style={styles.sectionTitle}>Proyectos</Text>
@@ -65,8 +65,8 @@ export default function HomeScreen() {
             {projects.map((project) => <ProjectCard key={project.id} project={project} archived={showArchived} canStartBackup={user?.rol === 'admin' && !showArchived} request={request} onCompleted={() => void load(true)} />)}
             {!projects.length && <View style={styles.emptyCard}>
               <Text style={styles.emptyIcon}>▤</Text>
-              <Text style={styles.emptyTitle}>{showArchived ? 'No hay proyectos archivados' : 'No hay proyectos activos'}</Text>
-              <Text style={styles.emptyText}>{showArchived ? 'Los proyectos archivados aparecerán aquí.' : 'Cuando se conecten bases PostgreSQL, aparecerán aquí.'}</Text>
+              <Text style={styles.emptyTitle}>{showArchived ? 'Nada por aquí todavía' : 'Aún no hay proyectos'}</Text>
+              <Text style={styles.emptyText}>{showArchived ? 'Cuando archives uno, lo encontrarás aquí.' : 'Agrega tu primera base de datos y empezamos a cuidar tus copias.'}</Text>
             </View>}
           </View>}
         <Text style={styles.role}>Sesión de {user?.rol}</Text>
