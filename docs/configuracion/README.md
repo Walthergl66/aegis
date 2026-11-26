@@ -11,8 +11,6 @@ La plantilla es `backend/.env.example`; `backend/core/config.py` define defaults
 | `BACKUP_ENCRYPTION_KEY` | — | Fernet para archivos, obligatorio y distinta. |
 | `SESSION_SECRET` | — | Secreto de firma JWT, obligatorio. |
 | `DATABASE_URL` | vacío | URI PostgreSQL del pooler de sesión de Supabase para el backend persistente. Si está vacío, usa SQLite local. |
-| `WEB_ADMIN_USERNAME` | `admin` | Usuario bootstrap del primer admin. |
-| `WEB_ADMIN_PASSWORD` | vacío | Bootstrap opcional. Si se deja vacía, el primer usuario se registra desde la app. |
 | `DB_PATH` | local `backend/data/backups.db`; Docker `/data/backups.db` | Archivo SQLite para desarrollo/pruebas cuando `DATABASE_URL` está vacío. |
 | `BACKUP_DIR` | local `backend/data/backups`; Docker `/data/backups` | Raíz de copias de proyecto. |
 | `BACKUP_KEEP_COUNT` | `10` | Retención local por proyecto. |
@@ -52,7 +50,7 @@ La plantilla es `backend/.env.example`; `backend/core/config.py` define defaults
 
 ## Cambios de configuración sensibles
 
-Las claves no son intercambiables ni se pueden rotar sin recifrado planificado. Cambiar `SESSION_SECRET` invalida sesiones activas. `WEB_ADMIN_*` permite crear una cuenta inicial; si no se configura contraseña, el registro se hace desde la app móvil.
+Las claves no son intercambiables ni se pueden rotar sin recifrado planificado. Cambiar `SESSION_SECRET` invalida sesiones activas. Las cuentas se crean desde el flujo de registro de la app móvil.
 
 ## App móvil
 

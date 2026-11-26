@@ -1,9 +1,5 @@
 """Regresiones del lote API hardening (A3-A4 y B3-B6)."""
 
-import logging
-from pathlib import Path
-
-
 def _admin_client(c):
     from services import web_users
 
@@ -12,35 +8,6 @@ def _admin_client(c):
         "username": "admin", "password": "AdminPass-12345",
     }).json()["access_token"]
     return {"Authorization": f"Bearer {tok}"}
-
-
-def test_boot_admin_provisional_no_se_loguea(db, monkeypatch, caplog):
-    """Regresión A4: la contraseña provisional va a un archivo, nunca a app.log."""
-    from main import bootstrap_admin
-    from services import web_users as web_users_srv
-
-    created = {}
-
-    def fake_create(username, password, rol):
-        created["password"] = password
-
-    monkeypatch.setattr(web_users_srv, "count_web_users", lambda: 0)
-    monkeypatch.setattr(web_users_srv, "create_web_user", fake_create)
-    monkeypatch.setenv("WEB_ADMIN_PASSWORD", "123")
-
-    import core.config as cfg
-    cfg._settings = None
-    try:
-        with caplog.at_level(logging.WARNING, logger="main"):
-            bootstrap_admin()
-        assert created.get("password"), "se debió generar una provisional"
-        assert created["password"] not in caplog.text, "no debe loguearse el password"
-        file_ = Path(cfg.settings().db_path.parent) / "provisional_admin_password.txt"
-        assert file_.exists()
-        assert created["password"] in file_.read_text(encoding="utf-8")
-        file_.unlink()
-    finally:
-        cfg._settings = None
 
 
 def test_json_invalido_responde_400_no_500(db):

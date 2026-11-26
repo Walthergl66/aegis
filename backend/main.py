@@ -12,8 +12,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
-import secrets
 from logging.handlers import RotatingFileHandler
 from zoneinfo import ZoneInfo
 
@@ -34,9 +32,7 @@ from notify import telegram as notify_mod
 from notify.daily_summary import send_daily_summary as _send_daily_summary
 from services import audit as audit_srv
 from services import backup_history as history_srv
-from services import ownership as ownership_srv
 from services import refresh_tokens as refresh_srv
-from services import web_users as web_users_srv
 
 
 def _split_time(value: str) -> tuple[int, int]:
@@ -69,63 +65,6 @@ def _setup_logging() -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("telegram").setLevel(logging.INFO)
-
-
-def bootstrap_admin() -> None:
-    """Crea la primera cuenta de acceso si todavía no existe ninguna.
-
-    Las credenciales vienen de .env (WEB_ADMIN_USERNAME / WEB_ADMIN_PASSWORD).
-    Si no se configuró una clave inicial, se habilita el registro desde la
-    app. Una contraseña configurada que no cumpla la política se reemplaza
-    con una clave provisional protegida junto a los datos.
-    """
-    if web_users_srv.count_web_users() > 0:
-        return
-    cfg = settings()
-    username = cfg.web_admin_username or "admin"
-    password = cfg.web_admin_password or ""
-    if not password:
-        logging.getLogger(__name__).info(
-            "No hay cuenta inicial configurada; la primera persona puede registrarse desde la app."
-        )
-        return
-    provisional = False
-    if len(password) < web_users_srv.MIN_PASSWORD_LENGTH:
-        password = secrets.token_urlsafe(12)
-        provisional = True
-    user_id = web_users_srv.create_web_user(username, password, rol="admin")
-    ownership_srv.claim_unowned_resources(user_id)
-    audit_srv.log_action(
-        "web_bootstrap_admin", "ok",
-        detalle=f"se creó el usuario admin inicial '{username}'",
-    )
-    log = logging.getLogger(__name__)
-    if provisional:
-        # La contraseña provisional no se loguea (app.log rota y persiste la
-        # historia). Se escribe en un archivo de un solo uso junto a la BD.
-        provisional_path = cfg.db_path.parent / "provisional_admin_password.txt"
-        try:
-            provisional_path.write_text(
-                f"Usuario: {username}\nContraseña provisional: {password}\n"
-                "Inicia sesión y cámbiala cuanto antes.\n",
-                encoding="utf-8",
-            )
-            try:
-                os.chmod(provisional_path, 0o600)
-            except OSError:  # noqa: BLE001 - Windows no soporta chmod: no bloquea
-                pass
-        except OSError as exc:  # noqa: BLE001
-            log.error("No se pudo escribir la contraseña provisional en %s: %s",
-                      provisional_path, exc)
-            provisional_path = None
-        if provisional_path is not None:
-            log.warning(
-                "WEB_ADMIN_PASSWORD no definido o demasiado corto (mín. %d caracteres): "
-                "se generó una provisional. Inicia sesión con la contraseña de %s.",
-                web_users_srv.MIN_PASSWORD_LENGTH, provisional_path,
-            )
-    else:
-        log.info("Usuario admin inicial creado con WEB_ADMIN_PASSWORD del .env.")
 
 
 def retention_purge() -> dict:
@@ -260,7 +199,6 @@ async def main() -> None:
     log = logging.getLogger("main")
 
     db_core.init_db()
-    bootstrap_admin()
     if not cfg.database_url:
         self_backup_mod.maiden_run_safe()
     retention_purge()

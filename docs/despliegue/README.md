@@ -22,7 +22,6 @@ Antes de desplegar, guarda las claves en un vault (`pass` con una GPG key privad
 | `SESSION_SECRET` | `openssl rand -hex 32` | Todos los JWT quedan inválidos (sesiones caídas) — no pierdes datos |
 | `DATABASE_URL` | Pooler de sesión del proyecto Supabase | El backend no puede leer/escribir tablas de aplicación |
 | `BOT_TOKEN` | BotFather | El bot deja de funcionar |
-| `WEB_ADMIN_USERNAME/PASSWORD` | opcional | Solo crea un usuario inicial si se configura explícitamente |
 
 Recomendado: `pass`.
 

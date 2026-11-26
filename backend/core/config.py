@@ -46,9 +46,6 @@ class Settings:
         self.throttle_window_seconds: int = self._int_env("THROTTLE_WINDOW_SECONDS", 60)
         self.throttle_block_seconds: int = self._int_env("THROTTLE_BLOCK_SECONDS", 120)
 
-        self.web_admin_username: str = os.getenv("WEB_ADMIN_USERNAME", "admin")
-        self.web_admin_password: str = os.getenv("WEB_ADMIN_PASSWORD", "")
-
         self.session_secret: str = self._required("SESSION_SECRET")
 
         # Si está definido, el backend usa PostgreSQL (p. ej. Supabase).
