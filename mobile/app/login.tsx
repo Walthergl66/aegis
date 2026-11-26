@@ -35,9 +35,9 @@ export default function LoginScreen() {
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.brandMark}><Text style={styles.brandIcon}>↗</Text></View>
-        <Text style={styles.eyebrow}>BACKUPS POSTGRESQL</Text>
-        <Text style={styles.title}>Tu infraestructura,{String.fromCharCode(10)}bajo control.</Text>
-        <Text style={styles.subtitle}>Inicia sesión para administrar tus conexiones y copias de seguridad.</Text>
+        <Text style={styles.eyebrow}>RESPALDOS SEGUROS</Text>
+        <Text style={styles.title}>{'Hola de nuevo'}</Text>
+        <Text style={styles.subtitle}>Entra para cuidar tus copias y estar tranquilo.</Text>
         <View style={styles.form}>
           <Text style={styles.label}>Usuario</Text>
           <TextInput value={username} onChangeText={setUsername} autoCapitalize="none" autoCorrect={false} textContentType="username" placeholder="Tu usuario" placeholderTextColor="#94a3b8" style={styles.input} accessibilityLabel="Usuario" />
@@ -49,13 +49,13 @@ export default function LoginScreen() {
           </>}
           {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
           <Pressable disabled={loading || !username || !password} onPress={submit} style={({ pressed }) => [styles.button, (loading || !username || !password) && styles.disabled, pressed && styles.pressed]}>
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Continuar</Text>}
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Entrar</Text>}
           </Pressable>
           <Pressable accessibilityRole="button" onPress={() => router.push('/register')} style={styles.registerLink}>
             <Text style={styles.registerText}>¿Primera vez? Crea tu cuenta</Text>
           </Pressable>
         </View>
-        <Text style={styles.footer}>Conexión segura con tu servidor privado</Text>
+        <Text style={styles.footer}>Tu conexión está protegida</Text>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
