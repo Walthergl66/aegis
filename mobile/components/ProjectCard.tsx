@@ -11,11 +11,11 @@ const ACTIVE_JOB_KEY = (id: number) => 'backup.job.' + id;
 const REQUEST_KEY = (id: number) => 'backup.request.' + id;
 
 function label(status?: string) {
-  return ({ queued: 'En cola', running: 'En ejecución', completed: 'Completado', failed: 'Falló', interrupted: 'Interrumpido' } as Record<string, string>)[status || ''] || '';
+  return ({ queued: 'En espera', running: 'Trabajando…', completed: 'Listo', failed: 'Algo salió mal', interrupted: 'Se detuvo' } as Record<string, string>)[status || ''] || '';
 }
 
 function dateLabel(value?: string | null) {
-  if (!value) return 'Sin copias todavía';
+  if (!value) return 'Aún sin copias';
   const date = new Date(value.includes('T') ? value : value.replace(' ', 'T') + 'Z');
   return Number.isNaN(date.valueOf()) ? value : date.toLocaleString();
 }
@@ -46,9 +46,8 @@ export default function ProjectCard({ project, canStartBackup, request, onComple
         setJob(current);
         if (!['queued', 'running'].includes(current.status)) {
           await SecureStore.deleteItemAsync(ACTIVE_JOB_KEY(project.id));
-          Alert.alert(current.status === 'completed' ? 'Backup completado' : 'Backup finalizado con error',
-            current.status === 'completed' ? 'La copia de ' + project.nombre + ' está lista.' : (current.detail || label(current.status)));
-          onCompleted();
+          Alert.alert(current.status === 'completed' ? 'Copia lista' : 'No se pudo completar',
+            current.status === 'completed' ? 'Ya guardamos una copia de ' + project.nombre + '.' : (current.detail || label(current.status)));          onCompleted();
         }
       } catch {
         // Keep the job ID locally and resume polling when connectivity returns.
@@ -72,7 +71,7 @@ export default function ProjectCard({ project, canStartBackup, request, onComple
       await SecureStore.setItemAsync(ACTIVE_JOB_KEY(project.id), created.id);
       setJob(created);
     } catch (error) {
-      Alert.alert('No se pudo iniciar el backup', error instanceof Error ? error.message : 'Intenta de nuevo.');
+      Alert.alert('No pudimos iniciar la copia', error instanceof Error ? error.message : 'Intenta de nuevo.');
     } finally {
       setStarting(false);
     }
@@ -82,7 +81,7 @@ export default function ProjectCard({ project, canStartBackup, request, onComple
     setRestoring(true);
     try {
       await restoreProject(request, project.id);
-      Alert.alert('Proyecto restaurado', project.nombre + ' volvió a estar activo.');
+      Alert.alert('Proyecto recuperado', project.nombre + ' volvió a estar activo.');
       onCompleted();
     } catch (error) {
       Alert.alert('No se pudo restaurar', error instanceof Error ? error.message : 'Intenta de nuevo.');
@@ -112,7 +111,7 @@ export default function ProjectCard({ project, canStartBackup, request, onComple
           {restoring ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.buttonText}>Restaurar</Text>}
         </Pressable>}
         {!archived && canStartBackup && <Pressable disabled={busy} onPress={() => void runBackup()} style={[styles.button, busy && styles.disabled]}>
-          {starting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.buttonText}>{busy ? label(job?.status) || 'Iniciando' : 'Respaldar'}</Text>}
+          {starting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.buttonText}>{busy ? label(job?.status) || 'Empezando…' : 'Hacer copia'}</Text>}
         </Pressable>}
       </View>
     </View>
