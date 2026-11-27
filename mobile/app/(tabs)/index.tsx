@@ -1,4 +1,4 @@
-import { router, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -9,7 +9,7 @@ import { listProjects, Project } from '@/services/projects';
 import { useSession } from '@/services/session';
 
 export default function HomeScreen() {
-  const { user, signOut, request } = useSession();
+  const { user, request } = useSession();
   const [projects, setProjects] = useState<Project[]>([]);
   const [showArchived, setShowArchived] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -36,15 +36,8 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />}>
         <View style={styles.topRow}>
           <View>
-            <Text style={styles.kicker}>BACKUPS POSTGRESQL</Text>
+            <Text style={styles.kicker}>RESPALDOS SEGUROS</Text>
             <Text style={styles.title}>Hola, {user?.username} 👋</Text>
-          </View>
-          <View style={styles.topActions}>
-            {user?.rol === 'admin' && <Pressable accessibilityRole="button" onPress={() => router.push('/projects/new')} style={styles.addButton}><Text style={styles.addText}>+</Text></Pressable>}
-            {user?.rol === 'admin' && <Pressable accessibilityRole="button" accessibilityLabel="Importar proyectos Supabase" onPress={() => router.push('/import/supabase')} style={styles.importButton}><Text style={styles.importText}>S</Text></Pressable>}
-            <Pressable accessibilityRole="button" accessibilityLabel="Cerrar sesión" onPress={() => void signOut()} style={styles.avatar}>
-              <Text style={styles.avatarText}>{user?.username.slice(0, 1).toUpperCase()}</Text>
-            </Pressable>
           </View>
         </View>
         <View style={styles.hero}>
@@ -81,13 +74,6 @@ const styles = StyleSheet.create({
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 24 },
   kicker: { color: '#64748b', fontSize: 10, letterSpacing: 1.5, fontWeight: '800', marginBottom: 7 },
   title: { color: '#0f172a', fontSize: 27, fontWeight: '800', letterSpacing: -0.5 },
-  avatar: { width: 44, height: 44, borderRadius: 16, backgroundColor: '#dbeafe', alignItems: 'center', justifyContent: 'center' },
-  topActions: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  addButton: { width: 40, height: 40, borderRadius: 14, backgroundColor: '#2563eb', alignItems: 'center', justifyContent: 'center', shadowColor: '#2563eb', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 3 },
-  addText: { color: '#fff', fontSize: 25, lineHeight: 28, fontWeight: '500' },
-  importButton: { width: 40, height: 40, borderRadius: 14, backgroundColor: '#dbeafe', alignItems: 'center', justifyContent: 'center' },
-  importText: { color: '#2563eb', fontSize: 16, fontWeight: '900' },
-  avatarText: { color: '#2563eb', fontSize: 17, fontWeight: '800' },
   hero: { backgroundColor: '#0f172a', borderRadius: 24, padding: 22, minHeight: 180, justifyContent: 'center', shadowColor: '#0f172a', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 5 },
   statusDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: '#4ade80', marginBottom: 13 },
   heroLabel: { color: '#94a3b8', letterSpacing: 1.3, fontWeight: '800', fontSize: 10 },
