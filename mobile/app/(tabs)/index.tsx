@@ -49,8 +49,19 @@ export default function HomeScreen() {
         <View style={styles.sectionRow}>
           <Text style={styles.sectionTitle}>Proyectos</Text>
           <View style={styles.sectionActions}>
-            {user?.rol === 'admin' && <Pressable onPress={() => setShowArchived((value) => !value)} accessibilityRole="button"><Text style={styles.refresh}>{showArchived ? 'Ver activos' : 'Archivados'}</Text></Pressable>}
-            <Pressable onPress={() => void load(true)} accessibilityRole="button"><Text style={styles.refresh}>Actualizar</Text></Pressable>
+            {user?.rol === 'admin' && (
+              <Pressable
+                onPress={() => setShowArchived((value) => !value)}
+                accessibilityRole="button"
+                accessibilityLabel={showArchived ? 'Ver proyectos activos' : 'Ver proyectos archivados'}
+                style={styles.iconBtn}
+              >
+                <Text style={styles.iconBtnText}>{showArchived ? '📂' : '🗄️'}</Text>
+              </Pressable>
+            )}
+            <Pressable onPress={() => void load(true)} accessibilityRole="button" accessibilityLabel="Actualizar lista" style={styles.iconBtn}>
+              <Text style={styles.iconBtnText}>↻</Text>
+            </Pressable>
           </View>
         </View>
         {loading ? <ActivityIndicator style={styles.loading} color="#2563eb" /> :
@@ -82,7 +93,9 @@ const styles = StyleSheet.create({
   sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 28, marginBottom: 14 },
   sectionTitle: { color: '#0f172a', fontSize: 18, fontWeight: '800' },
   refresh: { color: '#2563eb', fontWeight: '700', fontSize: 13 },
-  sectionActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  sectionActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  iconBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#eef4ff', alignItems: 'center', justifyContent: 'center' },
+  iconBtnText: { color: '#2563eb', fontSize: 18, fontWeight: '700' },
   loading: { marginTop: 30 },
   emptyCard: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 20, backgroundColor: '#fff', padding: 24 },
   emptyIcon: { color: '#2563eb', fontSize: 25, marginBottom: 15 },
