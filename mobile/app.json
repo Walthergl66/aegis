@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Backups PostgreSQL",
-    "slug": "backups-postgresql",
+    "name": "Aegis",
+    "slug": "aegis",
     "version": "1.0.0",
     "orientation": "portrait",
     "platforms": [
@@ -9,14 +9,14 @@
       "android"
     ],
     "icon": "./assets/images/icon.png",
-    "scheme": "backups-postgresql",
+    "scheme": "aegis",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "bundleIdentifier": "com.backupspostgresql.mobile",
+      "bundleIdentifier": "com.aegis.mobile",
       "supportsTablet": true
     },
     "android": {
-      "package": "com.backupspostgresql.mobile",
+      "package": "com.aegis.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
