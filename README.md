@@ -1,4 +1,4 @@
-# Bot de Backups y Monitoreo de PostgreSQL
+# Aegis — Backups de PostgreSQL
 
 Sistema para administrar bases PostgreSQL y ejecutar backups desde una app móvil nativa para Android/iOS. La app Expo/React Native es el único cliente de producto; la API privada y Telegram siguen como servicios de soporte del backend. Se puede conectar cualquier PostgreSQL accesible por URI; Supabase añade importación por PAT y consulta del estado cloud. El motor de copias siempre usa `pg_dump`.
 
