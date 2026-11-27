@@ -35,7 +35,7 @@ export default function LoginScreen() {
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.brandMark}><Text style={styles.brandIcon}>↗</Text></View>
-        <Text style={styles.eyebrow}>RESPALDOS SEGUROS</Text>
+        <Text style={styles.eyebrow}>AEGIS</Text>
         <Text style={styles.title}>{'Hola de nuevo'}</Text>
         <Text style={styles.subtitle}>Entra para cuidar tus copias y estar tranquilo.</Text>
         <View style={styles.form}>
