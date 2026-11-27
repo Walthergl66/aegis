@@ -37,7 +37,7 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void load(true)} />}>
         <View style={styles.topRow}>
           <View>
-            <Text style={styles.kicker}>RESPALDOS SEGUROS</Text>
+            <Text style={styles.kicker}>AEGIS</Text>
             <Text style={styles.title}>Hola, {user?.username} 👋</Text>
           </View>
         </View>
