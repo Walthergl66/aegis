@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useState } from 'react';
@@ -56,11 +57,11 @@ export default function HomeScreen() {
                 accessibilityLabel={showArchived ? 'Ver proyectos activos' : 'Ver proyectos archivados'}
                 style={styles.iconBtn}
               >
-                <Text style={styles.iconBtnText}>{showArchived ? '📂' : '🗄️'}</Text>
+                <Ionicons name={showArchived ? 'folder-open-outline' : 'archive-outline'} size={20} color="#2563eb" />
               </Pressable>
             )}
             <Pressable onPress={() => void load(true)} accessibilityRole="button" accessibilityLabel="Actualizar lista" style={styles.iconBtn}>
-              <Text style={styles.iconBtnText}>↻</Text>
+              <Ionicons name="refresh" size={20} color="#2563eb" />
             </Pressable>
           </View>
         </View>
