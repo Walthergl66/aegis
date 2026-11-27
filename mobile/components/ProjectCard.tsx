@@ -1,10 +1,10 @@
-import * as SecureStore from 'expo-secure-store';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { getBackupJob, Project, restoreProject, startBackup, BackupJob } from '@/services/projects';
 import type { SessionRequest } from '@/services/session';
+import { deleteItem, getItem, setItem } from '@/services/storage';
 
 type Props = { project: Project; canStartBackup: boolean; request: SessionRequest; onCompleted: () => void; archived?: boolean };
 const ACTIVE_JOB_KEY = (id: number) => 'backup.job.' + id;
@@ -27,7 +27,7 @@ export default function ProjectCard({ project, canStartBackup, request, onComple
 
   useEffect(() => {
     let active = true;
-    SecureStore.getItemAsync(ACTIVE_JOB_KEY(project.id)).then((id) => {
+    getItem(ACTIVE_JOB_KEY(project.id)).then((id) => {
       if (active && id) setJob({ id, status: 'queued' });
     }).catch(() => {});
     return () => { active = false; };
@@ -45,7 +45,7 @@ export default function ProjectCard({ project, canStartBackup, request, onComple
         if (!active) return;
         setJob(current);
         if (!['queued', 'running'].includes(current.status)) {
-          await SecureStore.deleteItemAsync(ACTIVE_JOB_KEY(project.id));
+          await deleteItem(ACTIVE_JOB_KEY(project.id));
           Alert.alert(current.status === 'completed' ? 'Copia lista' : 'No se pudo completar',
             current.status === 'completed' ? 'Ya guardamos una copia de ' + project.nombre + '.' : (current.detail || label(current.status)));          onCompleted();
         }
@@ -61,14 +61,14 @@ export default function ProjectCard({ project, canStartBackup, request, onComple
   async function runBackup() {
     setStarting(true);
     try {
-      let key = await SecureStore.getItemAsync(REQUEST_KEY(project.id));
+      let key = await getItem(REQUEST_KEY(project.id));
       if (!key) {
         key = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
-        await SecureStore.setItemAsync(REQUEST_KEY(project.id), key);
+        await setItem(REQUEST_KEY(project.id), key);
       }
       const created = await startBackup(request, project.id, key);
-      await SecureStore.deleteItemAsync(REQUEST_KEY(project.id));
-      await SecureStore.setItemAsync(ACTIVE_JOB_KEY(project.id), created.id);
+      await deleteItem(REQUEST_KEY(project.id));
+      await setItem(ACTIVE_JOB_KEY(project.id), created.id);
       setJob(created);
     } catch (error) {
       Alert.alert('No pudimos iniciar la copia', error instanceof Error ? error.message : 'Intenta de nuevo.');
