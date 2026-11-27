@@ -30,7 +30,7 @@ export default function SettingsScreen() {
           <Text style={styles.logoutText}>Cerrar sesión</Text>
         </Pressable>
 
-        <Text style={styles.footer}>Backups PostgreSQL · App móvil</Text>
+        <Text style={styles.footer}>Aegis · App móvil</Text>
       </View>
     </SafeAreaView>
   );
