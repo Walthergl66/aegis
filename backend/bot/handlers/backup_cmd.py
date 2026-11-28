@@ -25,7 +25,7 @@ from core.config import settings
 from notify import telegram as notify_mod
 from services import audit as audit_srv
 from services import backup_history as history_srv
-from services import projects as projects_srv
+from services import bot_projects
 from services import users as users_srv
 
 TELEGRAM_FILE_LIMIT = 50 * 1024 * 1024
@@ -116,7 +116,10 @@ async def _cmd_backup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         context.bot, chat_id, f"Iniciando backup de '{project['slug']}'…"
     )
     try:
-        full_project = projects_srv.get_project(project["id"], include_secret=True)
+        full_project = bot_projects.get_active_by_id(project["id"], include_secret=True)
+        if full_project is None:
+            await notify_mod.send_message(context.bot, chat_id, "Proyecto no encontrado o inactivo.")
+            return
     except Exception as exc:  # noqa: BLE001 - no dejar al usuario sin respuesta
         audit_srv.log_action("bot_backup", "error", user_id=user["id"],
                              project_id=project["id"], detalle=f"no se pudo cargar: {exc}")
