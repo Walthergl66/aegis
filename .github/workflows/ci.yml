@@ -22,7 +22,9 @@ jobs:
         with:
           python-version: "3.13"
           cache: pip
-          cache-dependency-path: backend/requirements-dev.txt
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
       - name: Install backend dependencies
         run: python -m pip install -r backend/requirements-dev.txt
       - name: Run backend tests without database dependency
@@ -30,8 +32,13 @@ jobs:
         run: python -m pytest -q -p no:cacheprovider -m "not database"
 
   database:
-    name: PostgreSQL integration tests
+    name: PostgreSQL integration tests (${{ matrix.shard }}/3)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        shard: [1, 2, 3]
     services:
       postgres:
         image: postgres:17
@@ -54,12 +61,18 @@ jobs:
         with:
           python-version: "3.13"
           cache: pip
-          cache-dependency-path: backend/requirements-dev.txt
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
       - name: Install backend dependencies
         run: python -m pip install -r backend/requirements-dev.txt
       - name: Run database tests
         working-directory: backend
-        run: python -m pytest -q -p no:cacheprovider -m database
+        run: >-
+          python -m pytest -q -p no:cacheprovider -m database
+          --splits 3 --group ${{ matrix.shard }}
+          --splitting-algorithm least_duration
+          --durations-path .test_durations
 
   frontend:
     name: Expo frontend checks
