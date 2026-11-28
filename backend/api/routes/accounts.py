@@ -29,7 +29,7 @@ async def create_account(request: Request, admin: dict = Depends(require_admin))
         )
     except accounts_srv.AccountError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    audit_srv.log_action("web_cuenta_crear", "ok", web_user_id=admin["id"],
+    audit_srv.log_action("app_cuenta_crear", "ok", app_user_id=admin["id"],
                          detalle=f"cuenta '{(data.get('nombre') or '').strip()}' "
                                  f"({data.get('provider', 'supabase')})")
     return {"id": account_id}
@@ -56,7 +56,7 @@ async def update_account(account_id: int, request: Request, admin: dict = Depend
         )
     except accounts_srv.AccountError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    audit_srv.log_action("web_cuenta_editar", "ok", web_user_id=admin["id"],
+    audit_srv.log_action("app_cuenta_editar", "ok", app_user_id=admin["id"],
                          detalle=f"cuenta id {account_id}")
     return {"ok": True}
 
@@ -69,6 +69,6 @@ async def delete_account(account_id: int, admin: dict = Depends(require_admin)):
         accounts_srv.delete_account(account_id, owner_user_id=admin["id"])
     except accounts_srv.AccountError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    audit_srv.log_action("web_cuenta_eliminar", "ok", web_user_id=admin["id"],
+    audit_srv.log_action("app_cuenta_eliminar", "ok", app_user_id=admin["id"],
                          detalle=f"cuenta id {account_id}")
     return {"ok": True}
