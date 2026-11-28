@@ -1,12 +1,8 @@
-"""Auth de la API: login JWT y perfil actual.
-
-Protección anti fuerza bruta (en capas):
-  1. Rate-limit por IP real (`slowapi`) sobre POST /api/auth/login.
-  2. Lockout persistente por usuario en la BD tras intentos fallidos.
-  3. Alerta por Telegram a los admins cuando una cuenta queda bloqueada.
-"""
+"""Autenticación de la API mediante JWT, refresh token y TOTP."""
 
 from __future__ import annotations
+
+import logging
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
@@ -17,11 +13,10 @@ from core import db
 from core.config import settings
 from core import jwt
 from core.jwt import create_token
-from notify import telegram as notify_mod
 from services import access_blacklist
 from services import audit as audit_srv
 from services import refresh_tokens
-from services import web_users as web_users_srv
+from services import app_users as app_users_srv
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -52,13 +47,13 @@ async def register(request: Request):
     if not username or not password:
         return JSONResponse({"detail": "Usuario y contraseña son obligatorios."}, status_code=400)
     try:
-        user_id = web_users_srv.create_web_user(username, password, rol="admin")
-    except web_users_srv.WebUserError as exc:
+        user_id = app_users_srv.create_app_user(username, password, rol="admin")
+    except app_users_srv.AppUserError as exc:
         return JSONResponse({"detail": str(exc)}, status_code=400)
     except db.INTEGRITY_ERRORS:
         return JSONResponse({"detail": "No se pudo crear la cuenta. Elige otro usuario."}, status_code=409)
 
-    user = web_users_srv.get_web_user_by_id(user_id)
+    user = app_users_srv.get_app_user_by_id(user_id)
     refresh = refresh_tokens.refresh_store.create(user)
     payload = {
         "access_token": create_token(user),
@@ -68,7 +63,7 @@ async def register(request: Request):
         "user": {"id": user["id"], "username": user["username"], "rol": user["rol"],
                  "totp_enabled": bool(user.get("totp_enabled"))},
     }
-    audit_srv.log_action("account_register", "ok", web_user_id=user_id)
+    audit_srv.log_action("account_register", "ok", app_user_id=user_id)
     return JSONResponse(payload, status_code=201)
 
 
@@ -85,10 +80,10 @@ async def login(request: Request):
             {"detail": "Usuario y contraseña son obligatorios."}, status_code=400
         )
 
-    locked_for = web_users_srv.get_lock_seconds(username, ip)
+    locked_for = app_users_srv.get_lock_seconds(username, ip)
     if locked_for > 0:
         audit_srv.log_action(
-            "web_login", "error", web_user_id=None,
+            "app_login", "error", app_user_id=None,
             detalle=f"intento sobre cuenta bloqueada'{username}'",
         )
         # Respuesta uniforme: no revela si la cuenta existe ni si está bloqueada.
@@ -96,46 +91,46 @@ async def login(request: Request):
             {"detail": "Usuario o contraseña incorrectos."}, status_code=401
         )
 
-    user = web_users_srv.authenticate(username, password)
+    user = app_users_srv.authenticate(username, password)
     if user is None:
-        attempts, locked_now = web_users_srv.record_failed_login(username, ip)
+        attempts, locked_now = app_users_srv.record_failed_login(username, ip)
         audit_srv.log_action(
-            "web_login", "error", web_user_id=None,
+            "app_login", "error", app_user_id=None,
             detalle=f"intento con usuario '{username}' (fallo #{attempts})",
         )
         if locked_now:
             detail = (
-                f"Se bloqueó temporalmente la cuenta web '{username}' por "
-                f"{web_users_srv.LOCKOUT_MINUTES} min tras "
-                f"{web_users_srv.MAX_FAILED_ATTEMPTS} intentos fallidos."
+                f"Se bloqueó temporalmente la cuenta '{username}' por "
+                f"{app_users_srv.LOCKOUT_MINUTES} min tras "
+                f"{app_users_srv.MAX_FAILED_ATTEMPTS} intentos fallidos."
             )
-            await notify_mod.notify_admins("🚨 " + detail)
+            logging.getLogger("security").warning(detail)
         return JSONResponse(
             {"detail": "Usuario o contraseña incorrectos."}, status_code=401
         )
 
     # 2FA: si la cuenta tiene TOTP activo, el primer paso solo valida la contraseña.
     code = (data.get("code") or "").strip()
-    if user.get("totp_enabled") and not web_users_srv.verify_totp_code(user["id"], code):
-        attempts, locked_now = web_users_srv.record_failed_login(username, ip)
+    if user.get("totp_enabled") and not app_users_srv.verify_totp_code(user["id"], code):
+        attempts, locked_now = app_users_srv.record_failed_login(username, ip)
         audit_srv.log_action(
-            "web_login_2fa", "error", web_user_id=user["id"],
+            "app_login_2fa", "error", app_user_id=user["id"],
             detalle=f"código 2FA inválido (fallo #{attempts})",
         )
         if locked_now:
             detail = (
-                f"Se bloqueó temporalmente la cuenta web '{username}' por "
-                f"{web_users_srv.LOCKOUT_MINUTES} min tras "
-                f"{web_users_srv.MAX_FAILED_ATTEMPTS} intentos fallidos de 2FA."
+                f"Se bloqueó temporalmente la cuenta '{username}' por "
+                f"{app_users_srv.LOCKOUT_MINUTES} min tras "
+                f"{app_users_srv.MAX_FAILED_ATTEMPTS} intentos fallidos de 2FA."
             )
-            await notify_mod.notify_admins("🚨 " + detail)
+            logging.getLogger("security").warning(detail)
         return JSONResponse(
             {"detail": "El código de verificación (2FA) es incorrecto.",
              "totp_required": True},
             status_code=401,
         )
 
-    web_users_srv.reset_failed_logins(username, ip)
+    app_users_srv.reset_failed_logins(username, ip)
     token = create_token(user)
     payload = {
             "access_token": token,
@@ -147,13 +142,13 @@ async def login(request: Request):
     refresh = refresh_tokens.refresh_store.create(user)
     payload["refresh_token"] = refresh
     response = JSONResponse(payload)
-    audit_srv.log_action("web_login", "ok", web_user_id=user["id"])
+    audit_srv.log_action("app_login", "ok", app_user_id=user["id"])
     return response
 
 
 @router.get("/me")
 async def me(user: dict = Depends(get_current_user)) -> dict:
-    totp = web_users_srv.totp_enabled_for(user["id"])
+    totp = app_users_srv.totp_enabled_for(user["id"])
     return {"id": user["id"], "username": user["username"], "rol": user["rol"],
             "totp_enabled": totp}
 
@@ -170,7 +165,7 @@ async def refresh_token(request: Request):
     if rotated is None:
         return JSONResponse({"detail": "Sesión expirada."}, status_code=401)
     new_refresh, entry = rotated
-    raw_user = web_users_srv.get_web_user_by_id(entry["user_id"])
+    raw_user = app_users_srv.get_app_user_by_id(entry["user_id"])
     # Si el usuario fue eliminado o desactivado, se rechaza la renovación y se
     # revoca la sesión: no seguimos rotando tokens de forma inútil.
     if raw_user is None or not raw_user.get("activo"):
@@ -207,10 +202,10 @@ async def totp_setup(request: Request, user: dict = Depends(get_current_user)):
             data = await request.json()
         except Exception:  # noqa: BLE001
             data = {}
-        result = web_users_srv.generate_totp_secret(user["id"], data.get("code") or None)
-    except web_users_srv.WebUserError as exc:
+        result = app_users_srv.generate_totp_secret(user["id"], data.get("code") or None)
+    except app_users_srv.AppUserError as exc:
         return JSONResponse({"detail": str(exc)}, status_code=400)
-    audit_srv.log_action("totp_setup", "ok", web_user_id=user["id"])
+    audit_srv.log_action("totp_setup", "ok", app_user_id=user["id"])
     return {
         "secret": result["secret"],
         "otpauth_url": result["otpauth_url"],
@@ -224,12 +219,12 @@ async def totp_confirm(request: Request, user: dict = Depends(get_current_user))
     data = await request.json()
     code = data.get("code") or ""
     try:
-        web_users_srv.confirm_totp(user["id"], code)
-    except web_users_srv.WebUserError as exc:
-        audit_srv.log_action("totp_confirm", "error", web_user_id=user["id"],
+        app_users_srv.confirm_totp(user["id"], code)
+    except app_users_srv.AppUserError as exc:
+        audit_srv.log_action("totp_confirm", "error", app_user_id=user["id"],
                              detalle=str(exc))
         return JSONResponse({"detail": str(exc)}, status_code=400)
-    audit_srv.log_action("totp_confirm", "ok", web_user_id=user["id"])
+    audit_srv.log_action("totp_confirm", "ok", app_user_id=user["id"])
     return {"ok": True}
 
 
@@ -239,12 +234,12 @@ async def totp_disable(request: Request, user: dict = Depends(get_current_user))
     data = await request.json()
     code = data.get("code") or ""
     try:
-        web_users_srv.disable_totp(user["id"], code)
-    except web_users_srv.WebUserError as exc:
-        audit_srv.log_action("totp_disable", "error", web_user_id=user["id"],
+        app_users_srv.disable_totp(user["id"], code)
+    except app_users_srv.AppUserError as exc:
+        audit_srv.log_action("totp_disable", "error", app_user_id=user["id"],
                              detalle=str(exc))
         return JSONResponse({"detail": str(exc)}, status_code=400)
-    audit_srv.log_action("totp_disable", "ok", web_user_id=user["id"])
+    audit_srv.log_action("totp_disable", "ok", app_user_id=user["id"])
     return {"ok": True}
 
 
