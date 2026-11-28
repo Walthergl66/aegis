@@ -1,4 +1,4 @@
-"""Log de auditoría transversal (bot y web)."""
+"""Registro de auditoría del servicio y sus cuentas."""
 
 from __future__ import annotations
 
@@ -10,17 +10,16 @@ from core import db
 def log_action(
     accion: str,
     resultado: str,
-    user_id: int | None = None,
-    web_user_id: int | None = None,
+    app_user_id: int | None = None,
     project_id: int | None = None,
     detalle: str | None = None,
 ) -> None:
     db.execute(
         """
-        INSERT INTO audit_log (user_id, web_user_id, project_id, accion, resultado, detalle)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO audit_log (app_user_id, project_id, accion, resultado, detalle)
+        VALUES (?, ?, ?, ?, ?)
         """,
-        (user_id, web_user_id, project_id, accion, resultado, detalle),
+        (app_user_id, project_id, accion, resultado, detalle),
     )
 
 
@@ -29,19 +28,17 @@ def list_audit(
 ) -> list[dict]:
     sql = """
         SELECT a.*,
-               u.nombre   AS telegram_user,
-               w.username AS web_user,
+               w.username AS app_user,
                p.slug     AS project_slug
         FROM audit_log a
-        LEFT JOIN users      u ON u.id = a.user_id
-        LEFT JOIN web_users  w ON w.id = a.web_user_id
+        LEFT JOIN app_users  w ON w.id = a.app_user_id
         LEFT JOIN projects   p ON p.id = a.project_id
     """
     params: tuple = ()
     if owner_user_id is not None:
         sql += (
             " WHERE p.owner_user_id = ? "
-            "OR (a.project_id IS NULL AND a.web_user_id = ?) "
+            "OR (a.project_id IS NULL AND a.app_user_id = ?) "
         )
         params = (owner_user_id, owner_user_id)
     sql += """
@@ -56,10 +53,8 @@ def _row_to_dict(row) -> dict:
     """Normaliza una fila: expone `fecha` (alias de timestamp) y `origen`."""
     data = dict(row)
     data["fecha"] = row["timestamp"]
-    if row["web_user"]:
-        data["origen"] = f"App · {row['web_user']}"
-    elif row["telegram_user"]:
-        data["origen"] = f"Telegram · {row['telegram_user']}"
+    if row["app_user"]:
+        data["origen"] = f"App · {row['app_user']}"
     else:
         data["origen"] = "Sistema"
     return data
@@ -75,7 +70,7 @@ def count_audit_for_user(owner_user_id: int) -> int:
         "SELECT COUNT(*) AS c FROM audit_log a "
         "LEFT JOIN projects p ON p.id = a.project_id "
         "WHERE p.owner_user_id = ? "
-        "OR (a.project_id IS NULL AND a.web_user_id = ?)",
+        "OR (a.project_id IS NULL AND a.app_user_id = ?)",
         (owner_user_id, owner_user_id),
     )
     return row["c"] if row else 0
@@ -84,7 +79,7 @@ def count_audit_for_user(owner_user_id: int) -> int:
 def purge_old(days: int) -> int:
     """Borra entradas de auditoría anteriores a `days` días. Devuelve nº borrado."""
     # `timestamp` se guarda en UTC; el corte de retención debe calcularse en UTC
-    # (naive) para comparar con las cadenas almacenadas por SQLite.
+    # (naive) para comparar con las cadenas almacenadas por PostgreSQL.
     cutoff = (
         datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
     ).strftime("%Y-%m-%d %H:%M:%S")
