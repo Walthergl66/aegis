@@ -70,7 +70,7 @@ def test_audit_expone_fecha_y_origen(db):
     row = rows[0]
     assert row["fecha"] == row["timestamp"]
     assert row["fecha"]
-    assert row["origen"] == "Web · admin"
+    assert row["origen"] == "App · admin"
 
 
 class _FakeRequest:
