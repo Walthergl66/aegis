@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 import psycopg
+from psycopg.conninfo import conninfo_to_dict
 from psycopg.rows import dict_row
 
 from core.config import settings
@@ -44,9 +45,12 @@ class _PostgresConnection:
 
 def connect():
     cfg = settings()
+    # TLS is required by default. This lets isolated local/CI PostgreSQL
+    # services explicitly select sslmode=disable in their disposable URL.
+    sslmode = conninfo_to_dict(cfg.database_url).get("sslmode", "require")
     raw = psycopg.connect(
         cfg.database_url,
-        sslmode="require",
+        sslmode=sslmode,
         connect_timeout=10,
         row_factory=dict_row,
         prepare_threshold=None,
