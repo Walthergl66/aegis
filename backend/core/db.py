@@ -84,11 +84,7 @@ def init_db() -> None:
     if cfg.database_url:
         if psycopg is None:
             raise RuntimeError("DATABASE_URL requiere instalar psycopg[binary].")
-        schema = Path(__file__).resolve().parent.parent / "db" / "schema.postgres.sql"
-        with connect() as conn:
-            for statement in schema.read_text(encoding="utf-8").split(";"):
-                if statement.strip():
-                    conn.execute(statement)
+        _init_postgres_db()
         return
 
     db_path: Path = cfg.db_path
@@ -98,6 +94,51 @@ def init_db() -> None:
         with connect() as conn:
             conn.executescript(schema.read_text(encoding="utf-8"))
     _migrate()
+
+
+def _init_postgres_db() -> None:
+    """Crea el esquema base y aplica migraciones PostgreSQL pendientes.
+
+    El esquema base se ejecuta en cada arranque para crear tablas faltantes.
+    Las modificaciones a tablas e índices existentes deben añadirse como
+    archivos versionados en ``db/migrations/postgres``.
+    """
+    db_dir = Path(__file__).resolve().parent.parent / "db"
+    schema = db_dir / "schema.postgres.sql"
+    migrations_dir = db_dir / "migrations" / "postgres"
+
+    with connect() as conn:
+        for statement in schema.read_text(encoding="utf-8").split(";"):
+            if statement.strip():
+                conn.execute(statement)
+
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS schema_migrations (
+                   version TEXT PRIMARY KEY,
+                   applied_at TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP::text)
+               )"""
+        )
+        applied = {
+            row["version"]
+            for row in conn.execute("SELECT version FROM schema_migrations").fetchall()
+        }
+
+        if not migrations_dir.is_dir():
+            return
+        for migration in sorted(migrations_dir.glob("*.sql")):
+            version = migration.stem.split("_", 1)[0]
+            if version in applied:
+                continue
+            # Cada archivo se confirma junto a su registro de versión. Si una
+            # sentencia falla, la transacción revierte y el siguiente arranque
+            # puede volver a intentarla.
+            for statement in migration.read_text(encoding="utf-8").split(";"):
+                if statement.strip():
+                    conn.execute(statement)
+            conn.execute(
+                "INSERT INTO schema_migrations (version) VALUES (?)",
+                (version,),
+            )
 
 
 def _migrate() -> None:
@@ -176,17 +217,6 @@ def _migrate() -> None:
         )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_accounts_owner ON accounts (owner_user_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_projects_owner ON projects (owner_user_id)")
-        # La instalación anterior compartía recursos entre sus usuarios. Para
-        # conservarla sin exponerla a las cuentas nuevas, se asigna al usuario
-        # más antiguo; si aún no hay cuenta, el primer registro reclamará huérfanos.
-        conn.execute(
-            "UPDATE accounts SET owner_user_id = (SELECT MIN(id) FROM web_users) "
-            "WHERE owner_user_id IS NULL AND EXISTS (SELECT 1 FROM web_users)"
-        )
-        conn.execute(
-            "UPDATE projects SET owner_user_id = (SELECT MIN(id) FROM web_users) "
-            "WHERE owner_user_id IS NULL AND EXISTS (SELECT 1 FROM web_users)"
-        )
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
 
