@@ -2,3 +2,4 @@
 
 # Dependencias solo para desarrollo/pruebas (no se instalan en el contenedor de producción).
 pytest==9.1.1
+pytest-split==0.11.0
