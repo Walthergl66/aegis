@@ -32,8 +32,8 @@ def _client_address(request) -> str:
     return "unknown"
 
 
-def should_notify_rate_limit() -> bool:
-    """True si toca enviar alerta por rate-limit (a lo sumo una cada 5 min)."""
+def should_log_rate_limit() -> bool:
+    """True si se debe registrar el evento (como máximo una vez cada 5 minutos)."""
     global _last_alert_at
     with _alert_lock:
         now = time.time()
