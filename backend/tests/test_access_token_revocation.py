@@ -51,10 +51,10 @@ def test_blacklist_no_se_vacia_al_llenarse():
 
 def test_jwt_lleva_jti(db):
     from core import jwt
-    from services import web_users
+    from services import app_users
 
-    uid = web_users.create_web_user("u1", "LargaSegura-2026", rol="admin")
-    user = web_users.get_web_user_by_id(uid)
+    uid = app_users.create_app_user("u1", "LargaSegura-2026", rol="admin")
+    user = app_users.get_app_user_by_id(uid)
     token = jwt.create_token({"id": user["id"], "username": user["username"], "rol": user["rol"]})
     claims = jwt.decode_token(token)
     assert isinstance(claims.get("jti"), str) and len(claims["jti"]) > 8
@@ -64,10 +64,10 @@ def test_jwt_lleva_audiencia_y_se_valida(db):
     import pytest
 
     from core import jwt
-    from services import web_users
+    from services import app_users
 
-    uid = web_users.create_web_user("u1", "LargaSegura-2026", rol="admin")
-    user = web_users.get_web_user_by_id(uid)
+    uid = app_users.create_app_user("u1", "LargaSegura-2026", rol="admin")
+    user = app_users.get_app_user_by_id(uid)
     token = jwt.create_token({"id": user["id"], "username": user["username"], "rol": user["rol"]})
     claims = jwt.decode_token(token)
     assert claims.get("aud") == "supabase-backups-api"
@@ -88,9 +88,9 @@ def test_token_revocado_queda_invalido_en_deps(db):
     from fastapi.testclient import TestClient
     from api.app import app
     from core import jwt
-    from services import access_blacklist, web_users
+    from services import access_blacklist, app_users
 
-    web_users.create_web_user("admin", "AdminPass-12345", rol="admin")
+    app_users.create_app_user("admin", "AdminPass-12345", rol="admin")
     with TestClient(app) as c:
         tok = c.post("/api/auth/login", json={"username": "admin", "password": "AdminPass-12345"}).json()["access_token"]
         claims = jwt.decode_token(tok)
@@ -103,9 +103,9 @@ def test_logout_revoca_access_token(db):
     from fastapi.testclient import TestClient
     from api.app import app
     from core import jwt
-    from services import web_users
+    from services import app_users
 
-    web_users.create_web_user("admin", "AdminPass-12345", rol="admin")
+    app_users.create_app_user("admin", "AdminPass-12345", rol="admin")
     with TestClient(app) as c:
         resp = c.post("/api/auth/login", json={"username": "admin", "password": "AdminPass-12345"})
         tok = resp.json()["access_token"]
