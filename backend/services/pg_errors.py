@@ -1,7 +1,7 @@
 """Traducción de errores de PostgreSQL a mensajes amigables.
 
 Centraliza el mapeo del stderr de `psql`/`pg_dump` para que tanto el motor de
-backup como la API y el bot hablen el mismo idioma. No depende de Supabase:
+backup como la API y el scheduler hablen el mismo idioma. No depende de Supabase:
 cualquier PostgreSQL devuelve estos errores.
 """
 
