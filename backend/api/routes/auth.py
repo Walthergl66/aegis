@@ -22,7 +22,6 @@ from services import access_blacklist
 from services import audit as audit_srv
 from services import refresh_tokens
 from services import web_users as web_users_srv
-from services import ownership as ownership_srv
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -59,7 +58,6 @@ async def register(request: Request):
     except db.INTEGRITY_ERRORS:
         return JSONResponse({"detail": "No se pudo crear la cuenta. Elige otro usuario."}, status_code=409)
 
-    ownership_srv.claim_unowned_resources(user_id)
     user = web_users_srv.get_web_user_by_id(user_id)
     refresh = refresh_tokens.refresh_store.create(user)
     payload = {
