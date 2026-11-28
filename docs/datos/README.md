@@ -1,6 +1,6 @@
 # Datos y persistencia
 
-Supabase PostgreSQL almacena las cuentas de acceso, conexiones, proyectos, sesiones, trabajos, historial y auditoría. El esquema se define en `backend/db/schema.postgres.sql` y crea tablas vacías: no inserta un usuario ni una conexión por defecto. El backend se conecta usando `DATABASE_URL`, guardada solo en `backend/.env`.
+Supabase PostgreSQL almacena las cuentas de acceso, conexiones, proyectos, sesiones, trabajos, historial y auditoría. El esquema inicial se define en `backend/db/schema.postgres.sql`; las actualizaciones incrementales van en `backend/db/migrations/postgres/`. El esquema crea tablas vacías: no inserta un usuario ni una conexión por defecto. El backend se conecta usando `DATABASE_URL`, guardada solo en `backend/.env`.
 
 SQLite se conserva como alternativa local para desarrollo y pruebas (`DB_PATH`). Los archivos de backup siguen en `BACKUP_DIR` dentro del volumen `./data`; no forman parte de esta migración de tablas.
 
@@ -19,11 +19,13 @@ SQLite se conserva como alternativa local para desarrollo y pruebas (`DB_PATH`).
 | `access_token_revocations` | `jti` revocado y vencimiento del JWT; conserva revocaciones entre reinicios y permite purgar las expiradas. |
 | `backup_jobs` | Cola persistente para solicitudes web, usuario solicitante, clave idempotente, estado, tiempos y vínculo al historial. |
 
-El esquema íntegro, columnas, índices y restricciones está en `backend/db/schema.sql`. La auditoría no define FK para `project_id`; las tablas de permisos e historial sí vinculan proyecto/usuario según el esquema.
+El esquema SQLite está en `backend/db/schema.sql` y el esquema inicial PostgreSQL en `backend/db/schema.postgres.sql`. La auditoría no define FK para `project_id`; las tablas de permisos e historial sí vinculan proyecto/usuario según el esquema.
 
 ## Inicialización y evolución
 
-`core.db.init_db()` crea directorios y ejecuta `schema.sql` solo si la base no existe o está vacía. Después `_migrate()` añade columnas incrementales, incluyendo propietarios para cuentas y proyectos. En datos existentes asigna los recursos previos a la cuenta de acceso más antigua; en una instalación nueva, la primera persona que se registra reclama los recursos sin propietario. También crea índices y asegura el grupo **Conexiones directas**. Solo ignora errores de `ALTER TABLE` que indiquen que una columna ya existe; otros errores de migración se propagan.
+Para SQLite, `core.db.init_db()` ejecuta `schema.sql` solo si la base no existe o está vacía y después `_migrate()` aplica los cambios incrementales. En PostgreSQL, cada arranque aplica el esquema inicial de forma idempotente y luego ejecuta, en orden, los archivos SQL aún no registrados en `schema_migrations`. Cada migración se registra en la misma transacción que sus cambios; si falla, se revierte y se vuelve a intentar al siguiente arranque. No edites el esquema inicial para modificar tablas ya creadas: agrega una nueva migración numerada en `backend/db/migrations/postgres/`. La migración `0001` completa columnas e índices en bases PostgreSQL existentes. Los recursos existentes sin propietario se mantienen inaccesibles desde la app hasta que se les asigne un propietario de forma explícita y verificada; el registro no los reclama automáticamente.
+
+Cada registro crea un espacio personal y recibe el rol `admin` para gestionar sus propios proyectos. Las rutas de la API filtran los recursos por `owner_user_id`; este rol no concede acceso a los datos de otros usuarios. El bot de Telegram solo opera sobre proyectos sin propietario móvil hasta que exista un vínculo de identidad explícito.
 
 Las filas históricas reciben proveedor `supabase` por defecto para conservar compatibilidad. Los nuevos proyectos `postgres` se agrupan bajo la cuenta interna **Conexiones directas**; aunque no necesiten PAT, conservan `account_id` válido por la FK obligatoria.
 
