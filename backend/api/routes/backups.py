@@ -62,7 +62,7 @@ async def download_backup(
     if not artifact.is_file():
         raise HTTPException(status_code=404, detail="El formato solicitado no está disponible.")
 
-    audit_srv.log_action("web_backup_descarga", "ok", web_user_id=admin["id"],
+    audit_srv.log_action("app_backup_descarga", "ok", app_user_id=admin["id"],
                          project_id=row["project_id"], detalle=f"backup={backup_id}, formato={file_format}")
     filename = f"{row['slug']}_{row['fecha'].replace(':', '').replace(' ', '_')}.{file_format}"
     return StreamingResponse(
