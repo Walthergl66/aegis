@@ -1,9 +1,9 @@
 """Regresiones del lote API hardening (A3-A4 y B3-B6)."""
 
 def _admin_client(c):
-    from services import web_users
+    from services import app_users
 
-    web_users.create_web_user("admin", "AdminPass-12345", rol="admin")
+    app_users.create_app_user("admin", "AdminPass-12345", rol="admin")
     tok = c.post("/api/auth/login", json={
         "username": "admin", "password": "AdminPass-12345",
     }).json()["access_token"]
@@ -33,9 +33,9 @@ def test_activo_false_como_cadena_desactiva_proyecto(db):
     from api.app import app
     from services import accounts as accounts_srv
     from services import projects as projects_srv
-    from services.web_users import create_web_user
+    from services.app_users import create_app_user
 
-    owner_id = create_web_user("admin", "AdminPass-12345", rol="admin")
+    owner_id = create_app_user("admin", "AdminPass-12345", rol="admin")
     acc = accounts_srv.create_account("A", "pat-x", owner_user_id=owner_id)
     pid = projects_srv.create_project(
         "p1", "P1", acc, "postgresql://u:p@h/db", "ref1", owner_user_id=owner_id
@@ -62,7 +62,7 @@ def test_delete_inexistente_devuelve_404(db):
 
     with TestClient(app) as c:
         admin = _admin_client(c)
-        for path in ("/api/accounts/99999", "/api/users/99999", "/api/web-users/99999"):
+        for path in ("/api/accounts/99999",):
             assert c.delete(path, headers=admin).status_code == 404, path
         assert c.delete("/api/projects/99999", headers=admin).status_code == 404
 
@@ -106,9 +106,9 @@ def test_backups_api_no_expone_ruta_absoluta(db):
     from core import db as db_mod
     from services import accounts as accounts_srv
     from services import projects as projects_srv
-    from services.web_users import create_web_user
+    from services.app_users import create_app_user
 
-    owner_id = create_web_user("admin", "AdminPass-12345", rol="admin")
+    owner_id = create_app_user("admin", "AdminPass-12345", rol="admin")
     acc = accounts_srv.create_account("A", "pat-x", owner_user_id=owner_id)
     pid = projects_srv.create_project(
         "p1", "P1", acc, "postgresql://u:p@h/db", "ref1", owner_user_id=owner_id
