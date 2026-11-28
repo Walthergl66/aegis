@@ -33,13 +33,18 @@ def test_activo_false_como_cadena_desactiva_proyecto(db):
     from api.app import app
     from services import accounts as accounts_srv
     from services import projects as projects_srv
+    from services.web_users import create_web_user
 
-    acc = accounts_srv.create_account("A", "pat-x")
+    owner_id = create_web_user("admin", "AdminPass-12345", rol="admin")
+    acc = accounts_srv.create_account("A", "pat-x", owner_user_id=owner_id)
     pid = projects_srv.create_project(
-        "p1", "P1", acc, "postgresql://u:p@h/db", "ref1"
+        "p1", "P1", acc, "postgresql://u:p@h/db", "ref1", owner_user_id=owner_id
     )
     with TestClient(app) as c:
-        admin = _admin_client(c)
+        tok = c.post("/api/auth/login", json={
+            "username": "admin", "password": "AdminPass-12345",
+        }).json()["access_token"]
+        admin = {"Authorization": f"Bearer {tok}"}
         r = c.put(
             f"/api/projects/{pid}",
             json={"activo": "false"},
@@ -101,10 +106,12 @@ def test_backups_api_no_expone_ruta_absoluta(db):
     from core import db as db_mod
     from services import accounts as accounts_srv
     from services import projects as projects_srv
+    from services.web_users import create_web_user
 
-    acc = accounts_srv.create_account("A", "pat-x")
+    owner_id = create_web_user("admin", "AdminPass-12345", rol="admin")
+    acc = accounts_srv.create_account("A", "pat-x", owner_user_id=owner_id)
     pid = projects_srv.create_project(
-        "p1", "P1", acc, "postgresql://u:p@h/db", "ref1"
+        "p1", "P1", acc, "postgresql://u:p@h/db", "ref1", owner_user_id=owner_id
     )
     db_mod.execute(
         "INSERT INTO backup_history (project_id, resultado, ruta_archivo) "
@@ -112,7 +119,10 @@ def test_backups_api_no_expone_ruta_absoluta(db):
         (pid, "ok", "/app/data/backups/p1/p1_20260101_010101.dump.enc"),
     )
     with TestClient(app) as c:
-        admin = _admin_client(c)
+        tok = c.post("/api/auth/login", json={
+            "username": "admin", "password": "AdminPass-12345",
+        }).json()["access_token"]
+        admin = {"Authorization": f"Bearer {tok}"}
         r = c.get("/api/backups", headers=admin)
         assert r.status_code == 200
         row = r.json()["rows"][0]
