@@ -8,7 +8,7 @@ from telegram.ext import ContextTypes
 from bot.handlers.common import _auth_or_deny
 from notify import telegram as notify_mod
 from services import audit as audit_srv
-from services import projects as projects_srv
+from services import bot_projects
 from services import users as users_srv
 
 _PROVIDER_LABELS = {"supabase": "Supabase", "postgres": "PostgreSQL"}
@@ -48,7 +48,7 @@ async def _visible_projects(user: dict) -> list[dict]:
     Los administradores ven todos. El resto ve los de su cuenta de Telegram
     (importados con su PAT) y aquellos sobre los que tiene permisos explícitos.
     """
-    projects = projects_srv.list_projects(only_active=True)
+    projects = bot_projects.list_active()
     if user["rol"] == "admin":
         return projects
 
