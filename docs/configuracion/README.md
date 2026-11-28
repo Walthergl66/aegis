@@ -23,7 +23,7 @@ La plantilla es `backend/.env.example`; `backend/core/config.py` define defaults
 | `SELF_BACKUP_KEEP_COUNT` | `10` | Self-backups a conservar. |
 | `SELF_BACKUP_TIME` | `03:00` | Hora local a la zona indicada. |
 | `SELF_BACKUP_TZ` | `UTC` | Zona del scheduler principal/self-backup y purga. |
-| `SELF_BACKUP_TELEGRAM` | `off` en código; `on` en plantilla | Enviar el self-backup más reciente a admins. |
+| `SELF_BACKUP_TELEGRAM` | `off` | Enviar a Telegram el self-backup cifrado. Solo quien tenga `BACKUP_ENCRYPTION_KEY` puede descifrarlo. |
 | `DAILY_SUMMARY_ENABLED` | `on` | Programa resumen diario. |
 | `DAILY_SUMMARY_TIME` | `08:00` | Hora del resumen. |
 | `DAILY_SUMMARY_TZ` | `UTC` | Zona horaria del resumen. |
@@ -46,7 +46,7 @@ La plantilla es `backend/.env.example`; `backend/core/config.py` define defaults
 | `THROTTLE_BLOCK_SECONDS` | `120` | Duración de bloqueo. |
 | `LOG_LEVEL` | `INFO` | Nivel de logging. |
 
-`DATABASE_URL` debe mantenerse como secreto de servidor y nunca configurarse en la app móvil. En producción, el backend usa Supabase PostgreSQL; los backups de bases administradas por la app siguen en el volumen local. `DB_PATH` y el self-backup SQLite solo aplican al modo local. La plantilla indica `SELF_BACKUP_TELEGRAM=on`, mientras que si la variable no existe el default del código es `off`.
+`DATABASE_URL` debe mantenerse como secreto de servidor y nunca configurarse en la app móvil. En producción, el backend usa Supabase PostgreSQL; los backups de bases administradas por la app siguen en el volumen local. `DB_PATH` y el self-backup SQLite solo aplican al modo local. El self-backup de la aplicación queda cifrado al enviarse por Telegram; conserva `BACKUP_ENCRYPTION_KEY` fuera de Telegram.
 
 ## Cambios de configuración sensibles
 
