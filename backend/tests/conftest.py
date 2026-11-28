@@ -18,6 +18,13 @@ os.environ.setdefault("SESSION_SECRET", "test-session-secret")
 import pytest  # noqa: E402
 
 
+def pytest_collection_modifyitems(items):
+    """Marca automáticamente pruebas que necesitan PostgreSQL persistente."""
+    for item in items:
+        if "db" in item.fixturenames:
+            item.add_marker(pytest.mark.database)
+
+
 @pytest.fixture(autouse=True)
 def _reset_rate_limit():
     from api.rate_limit import limiter
