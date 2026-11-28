@@ -38,7 +38,7 @@ from services.pg_errors import friendly_db_error
 logger = logging.getLogger(__name__)
 
 
-# Lock físico por proyecto: todos los caminos (bot con /backup, scheduler
+# Lock físico por proyecto: todos los caminos (API y scheduler
 # automático) ejecutan pg_dump sobre el MISMO destino; dos ejecuciones
 # simultáneas del mismo slug compartirían nombre de archivo y truncarían
 # el .dump. Vive aquí para cubrir a cualquier llamador.
@@ -164,7 +164,7 @@ def run_backup(project: dict) -> BackupResult:
 
     `project` debe incluir: id, slug, connection_plain. Es una operación
     bloqueante; llamarla desde asyncio con `asyncio.to_thread`. El lock por
-    proyecto vive aquí (no solo en el bot) para que el scheduler automático
+    proyecto vive aquí (desde todos los clientes) para que el scheduler automático
     no lance un segundo pg_dump sobre el mismo archivo en paralelo.
     """
     with _lock_for_project(project["id"]):
