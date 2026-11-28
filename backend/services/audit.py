@@ -39,7 +39,10 @@ def list_audit(
     """
     params: tuple = ()
     if owner_user_id is not None:
-        sql += " WHERE a.web_user_id = ? OR p.owner_user_id = ? "
+        sql += (
+            " WHERE p.owner_user_id = ? "
+            "OR (a.project_id IS NULL AND a.web_user_id = ?) "
+        )
         params = (owner_user_id, owner_user_id)
     sql += """
         ORDER BY a.timestamp DESC, a.id DESC
@@ -71,7 +74,8 @@ def count_audit_for_user(owner_user_id: int) -> int:
     row = db.fetch_one(
         "SELECT COUNT(*) AS c FROM audit_log a "
         "LEFT JOIN projects p ON p.id = a.project_id "
-        "WHERE a.web_user_id = ? OR p.owner_user_id = ?",
+        "WHERE p.owner_user_id = ? "
+        "OR (a.project_id IS NULL AND a.web_user_id = ?)",
         (owner_user_id, owner_user_id),
     )
     return row["c"] if row else 0
