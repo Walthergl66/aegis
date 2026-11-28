@@ -23,6 +23,7 @@ from core import sanitize
 from notify import telegram as notify_mod
 from services import audit as audit_srv
 from services import backup_history as history_srv
+from services import bot_projects
 from services import projects as projects_srv
 
 logger = logging.getLogger(__name__)
@@ -82,10 +83,13 @@ async def run_scheduled_backup(project_id: int) -> None:
         project = projects_srv.get_project(project_id, include_secret=True)
     except Exception as exc:  # noqa: BLE001 - no dejar morir el job del scheduler
         logger.exception("Job programado id=%s: no se pudo cargar el proyecto: %s", project_id, exc)
-        await _alert_scheduled_failure(
-            f"proyecto id={project_id}",
-            f"No se pudo cargar el proyecto para el backup programado: {exc}",
-        )
+        try:
+            await notify_mod.notify_admins(
+                "⚠️ Falló la carga de un backup programado. "
+                "Revisa los logs privados del servidor."
+            )
+        except Exception as notify_exc:  # noqa: BLE001
+            logger.error("No se pudo notificar el fallo de carga del backup: %s", notify_exc)
         return
     if project is None or not project.get("activo"):
         logger.info("Job programado ignorado: proyecto id=%s no está activo.", project_id)
@@ -100,7 +104,8 @@ async def run_scheduled_backup(project_id: int) -> None:
         log.exception("Backup programado '%s': %s", project["slug"], msg)
         history_srv.record(project_id, "error", detalle=msg)
         audit_srv.log_action("auto_backup", "error", project_id=project_id, detalle=msg)
-        await _alert_scheduled_failure(project["slug"], msg)
+        if bot_projects.is_unowned(project_id):
+            await _alert_scheduled_failure(project["slug"], msg)
         return
 
     if result.ok:
@@ -119,7 +124,8 @@ async def run_scheduled_backup(project_id: int) -> None:
         audit_srv.log_action("auto_backup", "error", project_id=project_id,
                              detalle=f"programado: {result.detalle}")
         log.error("Backup programado FALLÓ para '%s': %s", project["slug"], result.detalle)
-        await _alert_scheduled_failure(project["slug"], result.detalle)
+        if bot_projects.is_unowned(project_id):
+            await _alert_scheduled_failure(project["slug"], result.detalle)
 
 
 async def _alert_scheduled_failure(slug: str, detail: str) -> None:
