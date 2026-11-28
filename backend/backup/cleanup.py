@@ -6,7 +6,7 @@ si el proceso muere a mitad (o falla el cifrado) pueden quedar huérfanos en
 `BACKUP_DIR`. Este barrido se lanza al arrancar:
   - si el claro tiene su pareja `.enc`: seguro borrarlo (existe la copia cifrada);
   - si no tiene pareja: se borra igualmente (viola la garantía "sin claro en
-    disco") y se avisa a los admins por Telegram con la lista de lo eliminado.
+    disco") y se registra el resultado en el log del servicio.
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ def sweep_plaintext_backups() -> list[str]:
         if plain.is_file():
             _unlink(plain)
             removed.append(str(plain))
-    # También barre temporales propios (sqlite backup en curso quedó a medias).
+    # También barre temporales propios (PostgreSQL backup en curso quedó a medias).
     for tmp in sorted(base.rglob("*.tmp")):
         if tmp.is_file():
             _unlink(tmp)
