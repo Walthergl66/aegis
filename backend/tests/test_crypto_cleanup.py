@@ -179,7 +179,8 @@ def test_scheduler_avisa_si_falla_la_carga(db, monkeypatch):
 
     monkeypatch.setattr(projects_srv, "get_project", boom)
     asyncio.run(scheduler_jobs.run_scheduled_backup(1))
-    assert sent and "proyecto id=1" in sent[0]
+    assert sent and "logs privados" in sent[0]
+    assert "id=1" not in sent[0]
 
 
 def test_backup_paths_unicos_en_mismo_segundo(db, tmp_path, monkeypatch):
