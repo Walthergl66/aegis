@@ -17,4 +17,4 @@ El producto consta de una app Expo, una API FastAPI privada y PostgreSQL. La API
 | `db/` | Esquema y migraciones PostgreSQL. |
 | `mobile/` | Cliente Expo y acceso autenticado a la API. |
 
-La app no recibe credenciales de PostgreSQL del servidor. Las claves de conexión se cifran antes de persistirse; los endpoints verifican el propietario en cada lectura y escritura.
+La app no recibe credenciales de PostgreSQL del servidor. Las claves de conexión se cifran antes de persistirse; los endpoints verifican el propietario en cada lectura y escritura. Los schemas agrupan módulos y sus permisos; no sustituyen el control por `owner_user_id`.
