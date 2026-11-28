@@ -110,17 +110,6 @@ CREATE TABLE IF NOT EXISTS backup_jobs (
     UNIQUE (requested_by, idempotency_key)
 );
 
-CREATE INDEX IF NOT EXISTS idx_accounts_owner ON accounts (owner_user_id);
-CREATE INDEX IF NOT EXISTS idx_projects_owner ON projects (owner_user_id);
-CREATE INDEX IF NOT EXISTS idx_backup_history_project ON backup_history (project_id, fecha DESC);
-CREATE INDEX IF NOT EXISTS idx_permissions_user ON permissions (user_id);
-CREATE INDEX IF NOT EXISTS idx_permissions_project ON permissions (project_id);
-CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log (timestamp DESC);
-CREATE INDEX IF NOT EXISTS idx_refresh_sessions_user ON refresh_sessions (user_id);
-CREATE INDEX IF NOT EXISTS idx_refresh_sessions_expiry ON refresh_sessions (expires_at);
-CREATE INDEX IF NOT EXISTS idx_access_token_revocations_expiry ON access_token_revocations (expires_at);
-CREATE INDEX IF NOT EXISTS idx_backup_jobs_queue ON backup_jobs (status, created_at);
-
 -- El acceso a estas tablas se realiza solo a través del backend privado.
 -- La API móvil no recibe credenciales de PostgreSQL ni privilegios Data API.
 ALTER TABLE web_users ENABLE ROW LEVEL SECURITY;
