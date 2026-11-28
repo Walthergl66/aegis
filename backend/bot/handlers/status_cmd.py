@@ -13,6 +13,7 @@ from notify import telegram as notify_mod
 from services import accounts as accounts_srv
 from services import audit as audit_srv
 from services import backup_history as history_srv
+from services import bot_projects
 from services import projects as projects_srv
 from services import providers
 from services import users as users_srv
@@ -44,7 +45,10 @@ async def _cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
     audit_srv.log_action("bot_status", "ok", user_id=user["id"], project_id=project["id"])
-    full_project = projects_srv.get_project(project["id"], include_secret=True)
+    full_project = bot_projects.get_active_by_id(project["id"], include_secret=True)
+    if full_project is None:
+        await notify_mod.send_message(context.bot, chat_id, "Proyecto no encontrado o inactivo.")
+        return
 
     db_ok, db_msg = await asyncio.to_thread(
         monitor_mod.check_database_connection, full_project["connection_plain"]
@@ -91,7 +95,10 @@ async def _cmd_test(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await notify_mod.send_message(context.bot, chat_id, UNAUTHORIZED_TEXT)
         return
 
-    full_project = projects_srv.get_project(project["id"], include_secret=True)
+    full_project = bot_projects.get_active_by_id(project["id"], include_secret=True)
+    if full_project is None:
+        await notify_mod.send_message(context.bot, chat_id, "Proyecto no encontrado o inactivo.")
+        return
     result = await asyncio.to_thread(
         providers.postgres.test_connection, full_project["connection_plain"]
     )
@@ -130,6 +137,10 @@ async def _cmd_historial(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         audit_srv.log_action("bot_historial", "error", user_id=user["id"], project_id=project["id"],
                              detalle="permiso can_monitor denegado")
         await notify_mod.send_message(context.bot, chat_id, UNAUTHORIZED_TEXT)
+        return
+
+    if bot_projects.get_active_by_id(project["id"]) is None:
+        await notify_mod.send_message(context.bot, chat_id, "Proyecto no encontrado o inactivo.")
         return
 
     audit_srv.log_action("bot_historial", "ok", user_id=user["id"], project_id=project["id"])
