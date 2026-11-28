@@ -1,12 +1,12 @@
-"""Fixtures de prueba aisladas mediante esquemas PostgreSQL temporales."""
+"""Fixtures PostgreSQL aisladas en una base de datos de pruebas dedicada."""
 
 from __future__ import annotations
 
 import os
-import uuid
 
 # Permite importar la aplicación en tests sin abrir una conexión. Los tests que
-# acceden a datos requieren TEST_DATABASE_URL, una base de datos dedicada.
+# acceden a datos requieren TEST_DATABASE_URL con una base dedicada cuyo nombre
+# incluya "test"; cada fixture limpia solo los schemas/tablas de Aegis.
 os.environ.setdefault(
     "DATABASE_URL",
     os.environ.get("TEST_DATABASE_URL", "postgresql://unused:unused@127.0.0.1/unused"),
@@ -31,21 +31,34 @@ def _reset_rate_limit():
 
 @pytest.fixture()
 def db(monkeypatch):
-    """Crea un esquema efímero en la base declarada por TEST_DATABASE_URL."""
+    """Inicializa los schemas en TEST_DATABASE_URL, que debe ser desechable."""
     test_url = os.environ.get("TEST_DATABASE_URL")
     if not test_url:
         pytest.skip("Define TEST_DATABASE_URL para ejecutar pruebas con PostgreSQL")
 
     import psycopg
-    from psycopg.conninfo import make_conninfo
+    from psycopg import sql
+    from psycopg.conninfo import conninfo_to_dict
     from cryptography.fernet import Fernet
 
-    schema = f"test_{uuid.uuid4().hex}"
+    db_name = conninfo_to_dict(test_url).get("dbname", "")
+    if "test" not in db_name.lower():
+        pytest.fail("TEST_DATABASE_URL debe apuntar a una base dedicada cuyo nombre incluya 'test'.")
+
+    schemas = ("identity", "integrations", "app", "backups", "audit")
+    legacy_tables = (
+        "backup_jobs", "backup_history", "audit_log", "projects", "accounts",
+        "refresh_sessions", "access_token_revocations", "app_users", "web_users",
+        "permissions", "users", "schema_migrations",
+    )
     with psycopg.connect(test_url, autocommit=True) as admin_conn:
-        admin_conn.execute(f'CREATE SCHEMA "{schema}"')
-    isolated_url = make_conninfo(test_url, options=f"-c search_path={schema}")
-    monkeypatch.setenv("DATABASE_URL", isolated_url)
-    monkeypatch.setenv("BACKUP_DIR", f"/tmp/aegis-test-{schema}")
+        for schema in schemas:
+            admin_conn.execute(sql.SQL("DROP SCHEMA IF EXISTS {} CASCADE").format(sql.Identifier(schema)))
+        names = sql.SQL(", ").join(sql.Identifier("public", table) for table in legacy_tables)
+        admin_conn.execute(sql.SQL("DROP TABLE IF EXISTS {} CASCADE").format(names))
+
+    monkeypatch.setenv("DATABASE_URL", test_url)
+    monkeypatch.setenv("BACKUP_DIR", "/tmp/aegis-test-backups")
     monkeypatch.setenv("ENCRYPTION_KEY", Fernet.generate_key().decode())
     monkeypatch.setenv("BACKUP_ENCRYPTION_KEY", Fernet.generate_key().decode())
 
@@ -56,5 +69,3 @@ def db(monkeypatch):
     db_mod.init_db()
     yield db_mod
     cfg._settings = None
-    with psycopg.connect(test_url, autocommit=True) as admin_conn:
-        admin_conn.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
