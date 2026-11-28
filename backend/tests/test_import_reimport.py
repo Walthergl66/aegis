@@ -40,11 +40,13 @@ def test_proyecto_eliminado_vuelve_a_disponible(db):
     with TestClient(app) as c:
         admin = c.post("/api/auth/login", json={"username": "admin", "password": "AdminPass-12345"}).json()
         h = _token(admin)
+        owner_id = c.get("/api/auth/me", headers=h).json()["id"]
 
         # 1) Proyecto ACTIVO en BD → su ref no debe aparecer como disponible
-        acc_id = create_account("Cuenta test", "sbp_masked")
+        acc_id = create_account("Cuenta test", "sbp_masked", owner_user_id=owner_id)
         projects_srv.create_project(slug="nexo", nombre="nexo", account_id=acc_id,
-                                    connection="postgresql://u:p@h/db", project_ref="baxqsoqjihtllkakiwxq")
+                                    connection="postgresql://u:p@h/db", project_ref="baxqsoqjihtllkakiwxq",
+                                    owner_user_id=owner_id)
         with patch("services.supabase_api.list_projects", return_value=_fake_refs()):
             resp = c.post("/api/import/fetch", json={"pat": "sbp_x"}, headers=h)
         assert resp.status_code == 200
@@ -53,7 +55,7 @@ def test_proyecto_eliminado_vuelve_a_disponible(db):
 
         # 2) Se elimina (lógico: archived=1, activo=0) → libera su ref
         pid = projects_srv.get_by_slug("nexo")["id"]
-        projects_srv.delete_project(pid)
+        projects_srv.delete_project(pid, owner_user_id=owner_id)
 
         # 3) El ref vuelve a estar disponible para reimportar
         with patch("services.supabase_api.list_projects", return_value=_fake_refs()):
