@@ -155,9 +155,11 @@ def _report_errors(summary: dict, notify: bool) -> None:
     from core import sanitize
 
     detail = "\n".join(f"- {sanitize.redact_secrets(e)}" for e in summary["errors"][:10])
+    logger.error("Falló la copia fuera del sitio:\n%s", detail)
     try:
         notify_mod.notify_admins_sync(
-            "⚠️ Falló la copia fuera del sitio de los backups:\n" + detail
+            "⚠️ Falló la copia fuera del sitio de algunos backups. "
+            "Revisa los logs privados del servidor para ver los detalles."
         )
     except Exception as exc:  # noqa: BLE001
         logger.error("No se pudo notificar el fallo de la copia off-site: %s", exc)
