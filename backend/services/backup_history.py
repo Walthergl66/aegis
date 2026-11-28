@@ -53,7 +53,7 @@ def last_ok(project_id: int) -> dict | None:
 def purge_old(days: int) -> int:
     """Borra historial anterior a `days` días. Devuelve nº borrado."""
     # `fecha` se guarda en UTC; el corte de retención debe calcularse en UTC
-    # (naive) para comparar con las cadenas almacenadas por SQLite.
+    # (naive) para comparar con las cadenas almacenadas por PostgreSQL.
     cutoff = (
         datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
     ).strftime("%Y-%m-%d %H:%M:%S")
