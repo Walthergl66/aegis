@@ -8,12 +8,15 @@ from services.projects import (
 )
 
 
-def _account(db):
-    return db.execute("INSERT INTO accounts (nombre, pat_encrypted) VALUES ('A', 'x')")
+def _account(db, provider="supabase"):
+    return db.execute(
+        "INSERT INTO accounts (nombre, pat_encrypted, provider) VALUES ('A', 'x', ?)",
+        (provider,),
+    )
 
 
 def test_create_project_sin_ref_guarda_generica(db):
-    acc = _account(db)
+    acc = _account(db, provider="postgres")
     pid = create_project(
         slug="pg-local", nombre="PG Local", account_id=acc,
         connection="postgresql://u:p@localhost:5432/midb",
