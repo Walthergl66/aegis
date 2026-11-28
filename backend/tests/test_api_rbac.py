@@ -22,9 +22,12 @@ def test_rbac_lecturas_administrativas_solo_admin(db):
 
         assert c.get("/api/health").status_code == 200
 
-        for path in ("/api/accounts", "/api/users", "/api/web-users"):
-            assert c.get(path, headers=_token(admin)).status_code == 200, path
-            assert c.get(path, headers=_token(viewer)).status_code == 403, path
+        assert c.get("/api/accounts", headers=_token(admin)).status_code == 200
+        assert c.get("/api/accounts", headers=_token(viewer)).status_code == 403
+        # Las rutas de gestión de identidades legacy no están expuestas en la API móvil.
+        for path in ("/api/users", "/api/web-users"):
+            assert c.get(path, headers=_token(admin)).status_code == 404, path
+            assert c.get(path, headers=_token(viewer)).status_code == 404, path
 
         # Lecturas monitoreables permitidas al viewer.
         assert c.get("/api/backups", headers=_token(viewer)).status_code == 200
@@ -58,13 +61,14 @@ def test_viewer_no_lee_proyecto_archivado_por_id(db):
     from services import accounts as accounts_srv
     from services import projects as projects_srv
 
-    create_web_user("admin", "AdminPass-12345", rol="admin")
+    admin_id = create_web_user("admin", "AdminPass-12345", rol="admin")
     create_web_user("viewer", "ViewerPass-12345", rol="viewer")
-    acc = accounts_srv.create_account("A", "pat-x")
+    acc = accounts_srv.create_account("A", "pat-x", owner_user_id=admin_id)
     pid = projects_srv.create_project(
-        "archivado", "Archivado", acc, "postgresql://u:p@h/db", "ref1"
+        "archivado", "Archivado", acc, "postgresql://u:p@h/db", "ref1",
+        owner_user_id=admin_id,
     )
-    projects_srv.delete_project(pid)
+    projects_srv.delete_project(pid, owner_user_id=admin_id)
 
     with TestClient(app) as c:
         viewer = c.post("/api/auth/login", json={"username": "viewer", "password": "ViewerPass-12345"}).json()
