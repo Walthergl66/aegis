@@ -96,8 +96,8 @@ def test_run_self_backup_borra_tmp_si_falla_el_cifrado(db, tmp_path, monkeypatch
         cfg._settings = None
 
 
-def test_send_latest_no_nombra_enc_para_contenido_en_claro(db, tmp_path, monkeypatch):
-    """C9: el self-backup se envía descifrado; el nombre no debe llevar .enc."""
+def test_send_latest_envia_self_backup_cifrado(db, tmp_path, monkeypatch):
+    """El envío a Telegram conserva el cifrado de la base multiusuario."""
     from backup import self_backup
 
     dest = tmp_path / "self"
@@ -108,9 +108,6 @@ def test_send_latest_no_nombra_enc_para_contenido_en_claro(db, tmp_path, monkeyp
     import core.config as cfg
     cfg._settings = None
     try:
-        monkeypatch.setattr(
-            self_backup.crypto_mod, "decrypt_file_bytes", lambda _p: b"CONTENIDO-EN-CLARO"
-        )
         sent = {}
 
         async def fake_doc(filename, data, caption=""):
@@ -125,8 +122,8 @@ def test_send_latest_no_nombra_enc_para_contenido_en_claro(db, tmp_path, monkeyp
         monkeypatch.setattr("notify.telegram.notify_admins", fake_admins)
         asyncio.run(self_backup.send_latest_to_telegram())
 
-        assert sent.get("filename") == "panel_20260101_000000.sqlite"
-        assert ".enc" not in sent["filename"]
-        assert sent["data"] == b"CONTENIDO-EN-CLARO"
+        assert sent.get("filename") == "panel_20260101_000000.sqlite.enc"
+        assert sent["data"] == b"\x00" * 64
+        assert "cifrado" in sent["caption"]
     finally:
         cfg._settings = None
