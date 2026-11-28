@@ -24,13 +24,11 @@ class Settings:
 
         self.package_dir = PROJECT_ROOT
 
-        self.bot_token: str = self._required("BOT_TOKEN")
-
         self.encryption_key: str = self._required("ENCRYPTION_KEY")
 
         self.backup_encryption_key: str = self._required("BACKUP_ENCRYPTION_KEY")
 
-        self.web_docs_enabled: bool = os.getenv("WEB_DOCS_ENABLED", "").strip().lower() in ("1", "true", "yes", "on")
+        self.api_docs_enabled: bool = os.getenv("API_DOCS_ENABLED", "").strip().lower() in ("1", "true", "yes", "on")
 
         try:
             self.pbkdf2_iterations: int = int(os.getenv("PBKDF2_ITERATIONS", "600000"))
@@ -48,29 +46,20 @@ class Settings:
 
         self.session_secret: str = self._required("SESSION_SECRET")
 
-        # Si está definido, el backend usa PostgreSQL (p. ej. Supabase).
-        # En desarrollo/tests se puede dejar vacío y usar SQLite local.
-        self.database_url: str = os.getenv("DATABASE_URL", "").strip()
-        self.db_path: Path = Path(os.getenv("DB_PATH", str(PROJECT_ROOT / "data" / "backups.db")))
+        self.database_url: str = self._required("DATABASE_URL")
+        if not self.database_url.startswith(("postgres://", "postgresql://")):
+            raise RuntimeError("DATABASE_URL debe usar el protocolo PostgreSQL.")
         self.backup_dir: Path = Path(os.getenv("BACKUP_DIR", str(PROJECT_ROOT / "data" / "backups")))
 
         self.backup_keep_count: int = self._int_env("BACKUP_KEEP_COUNT", 10)
         self.backup_timeout_seconds: int = self._int_env("BACKUP_TIMEOUT_SECONDS", 600)
         self.backup_min_free_mb: int = self._int_env("BACKUP_MIN_FREE_MB", 1024)
-        self.backup_cooldown_seconds: int = self._int_env("BACKUP_COOLDOWN_SECONDS", 30)
         # Retención de tablas de log (purga semanal automática).
         self.audit_retention_days: int = self._int_env("AUDIT_RETENTION_DAYS", 365)
         self.history_retention_days: int = self._int_env("HISTORY_RETENTION_DAYS", 365)
 
-        # Self-backup de la base de datos de la aplicación (SQLite cifrado + Telegram).
-        self.self_backup_dir: Path = Path(os.getenv("SELF_BACKUP_DIR", str(self.backup_dir / "self")))
-        self.self_backup_keep: int = self._int_env("SELF_BACKUP_KEEP_COUNT", 10)
-        self.self_backup_time: str = os.getenv("SELF_BACKUP_TIME", "03:00")
-        self.self_backup_tz: str = os.getenv("SELF_BACKUP_TZ", "UTC")
-        self.self_backup_telegram: bool = os.getenv("SELF_BACKUP_TELEGRAM", "").strip().lower() in ("1", "true", "yes", "on")
-
-        self.web_host: str = os.getenv("WEB_HOST", "0.0.0.0")
-        self.web_port: int = self._int_env("WEB_PORT", 8080)
+        self.api_host: str = os.getenv("API_HOST", "0.0.0.0")
+        self.api_port: int = self._int_env("API_PORT", 8080)
 
         # Proxies confiados para uvicorn (proxy_headers): permite a FastAPI
         # ver el esquema real (https) y la IP real cuando Tailscale Serve
@@ -82,11 +71,6 @@ class Settings:
         )
 
         self.log_level: str = os.getenv("LOG_LEVEL", "INFO").strip().upper()
-
-        # Resumen diario de salud por Telegram.
-        self.daily_summary_enabled: bool = os.getenv("DAILY_SUMMARY_ENABLED", "on").strip().lower() in ("1", "true", "yes", "on")
-        self.daily_summary_time: str = os.getenv("DAILY_SUMMARY_TIME", "08:00")
-        self.daily_summary_tz: str = os.getenv("DAILY_SUMMARY_TZ", "UTC")
 
         # Copia fuera del sitio (S3 / R2 / B2 / MinIO). Requiere OFFSITE_ENABLED=on.
         self.offsite_enabled: bool = os.getenv("OFFSITE_ENABLED", "").strip().lower() in ("1", "true", "yes", "on")
