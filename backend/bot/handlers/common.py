@@ -14,7 +14,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from notify import telegram as notify_mod
-from services import projects as projects_srv
+from services import bot_projects
 from services import users as users_srv
 
 logger = logging.getLogger(__name__)
@@ -43,10 +43,7 @@ async def _auth_or_deny(update: Update, context: ContextTypes.DEFAULT_TYPE) -> d
 
 
 def _project_for_action(slug: str) -> dict | None:
-    project = projects_srv.get_by_slug(slug.strip())
-    if project is None or not project["activo"]:
-        return None
-    return project
+    return bot_projects.get_active_by_slug(slug.strip())
 
 
 def _fmt_size(size: float | None) -> str:
