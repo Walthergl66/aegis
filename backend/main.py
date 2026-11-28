@@ -208,8 +208,8 @@ async def main() -> None:
         try:
             await notify_mod.notify_admins(
                 "⚠️ Se encontraron backups SIN CIFRAR (restos de un proceso "
-                "interrumpido) y se eliminaron por seguridad:\n"
-                + "\n".join(f"- {r}" for r in removed[:10])
+                "interrumpido) y se eliminaron por seguridad. "
+                "Revisa los logs privados del servidor para ver los detalles."
             )
         except Exception as exc:  # noqa: BLE001
             log.error("No se pudo alertar del barrido de claros: %s", exc)
