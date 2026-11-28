@@ -1,15 +1,15 @@
-"""Tests de refresh tokens persistentes en SQLite (sobreviven al reinicio)."""
+"""Tests de refresh tokens persistentes en PostgreSQL (sobreviven al reinicio)."""
 
 import time
 
 import pytest
 
 from services import refresh_tokens
-from services import web_users
+from services import app_users
 
 
 def _make_user(db, uid=1, username="user1"):
-    created = web_users.create_web_user(username, "LargaSegura-2026", rol="admin")
+    created = app_users.create_app_user(username, "LargaSegura-2026", rol="admin")
     return {"id": created, "username": username, "rol": "admin"}
 
 
@@ -112,14 +112,14 @@ def test_cambio_de_password_revoca_sesiones(db):
     from fastapi.testclient import TestClient
     from api.app import app
 
-    uid = web_users.create_web_user("user1", "LargaSegura-2026", rol="viewer")
+    uid = app_users.create_app_user("user1", "LargaSegura-2026", rol="viewer")
     with TestClient(app) as c:
         refresh_token = _login(c)
         refreshed = c.post("/api/auth/refresh", json={"refresh_token": refresh_token})
         assert refreshed.status_code == 200
         refresh_token = refreshed.json()["refresh_token"]
 
-        web_users.update_web_user(uid, password="OtraSegura-2027!!")
+        app_users.update_app_user(uid, password="OtraSegura-2027!!")
 
         assert c.post("/api/auth/refresh", json={"refresh_token": refresh_token}).status_code == 401
 
@@ -129,11 +129,11 @@ def test_sesion_vieja_sigue_valida_sin_cambio_de_password(db):
     from fastapi.testclient import TestClient
     from api.app import app
 
-    uid = web_users.create_web_user("user1", "LargaSegura-2026", rol="viewer")
+    uid = app_users.create_app_user("user1", "LargaSegura-2026", rol="viewer")
     with TestClient(app) as c:
         refresh_token = _login(c)
 
-        web_users.update_web_user(uid, rol="admin")
+        app_users.update_app_user(uid, rol="admin")
 
         refreshed = c.post("/api/auth/refresh", json={"refresh_token": refresh_token})
         assert refreshed.status_code == 200
@@ -143,14 +143,14 @@ def test_refresh_rechazado_si_usuario_desactivado(db):
     from fastapi.testclient import TestClient
     from api.app import app
 
-    uid = web_users.create_web_user("user1", "LargaSegura-2026", rol="viewer")
+    uid = app_users.create_app_user("user1", "LargaSegura-2026", rol="viewer")
     with TestClient(app) as c:
         refresh_token = _login(c)
         refreshed = c.post("/api/auth/refresh", json={"refresh_token": refresh_token})
         assert refreshed.status_code == 200
         refresh_token = refreshed.json()["refresh_token"]
 
-        web_users.update_web_user(uid, activo=False)
+        app_users.update_app_user(uid, activo=False)
 
         # Desactivado: la sesión deja de renovarse (y se revoca).
         assert c.post("/api/auth/refresh", json={"refresh_token": refresh_token}).status_code == 401
@@ -160,11 +160,11 @@ def test_refresh_rechazado_si_usuario_eliminado(db):
     from fastapi.testclient import TestClient
     from api.app import app
 
-    uid = web_users.create_web_user("user1", "LargaSegura-2026", rol="viewer")
+    uid = app_users.create_app_user("user1", "LargaSegura-2026", rol="viewer")
     with TestClient(app) as c:
         refresh_token = _login(c)
 
-        web_users.delete_web_user(uid)
+        app_users.delete_app_user(uid)
 
         assert c.post("/api/auth/refresh", json={"refresh_token": refresh_token}).status_code == 401
 
@@ -173,9 +173,9 @@ def test_sesion_movil_usa_json_sin_cookie(db):
     """La app recibe refresh token en JSON sin crear cookies de navegador."""
     from fastapi.testclient import TestClient
     from api.app import app
-    from services import web_users
+    from services import app_users
 
-    web_users.create_web_user("user1", "LargaSegura-2026", rol="admin")
+    app_users.create_app_user("user1", "LargaSegura-2026", rol="admin")
     with TestClient(app) as c:
         resp = c.post("/api/auth/login", json={
             "username": "user1", "password": "LargaSegura-2026",
