@@ -1,8 +1,7 @@
 """Mini-WAF por IP (A5): corta escaneos y ráfagas anómalas hacia /api/*.
 
 Complementa a slowapi (enfocado en login): vigila el TRÁFICO GLOBAL por IP en
-una ventana deslizante y bloquea temporalmente al IP que lo supere, avisando
-por Telegram a los admins (a lo sumo una alerta cada 5 minutos).
+una ventana deslizante y bloquea temporalmente la IP que supere el umbral.
 """
 
 from __future__ import annotations
@@ -12,9 +11,6 @@ import time
 
 from core.config import settings
 
-_ALERT_COOLDOWN_SECONDS = 300
-_last_alert_at = 0.0
-_alert_lock = threading.Lock()
 
 
 class IpThrottle:
@@ -65,11 +61,3 @@ class IpThrottle:
 throttle = IpThrottle()
 
 
-def should_notify_scan() -> bool:
-    global _last_alert_at
-    with _alert_lock:
-        now = time.time()
-        if now - _last_alert_at < _ALERT_COOLDOWN_SECONDS:
-            return False
-        _last_alert_at = now
-        return True
