@@ -362,10 +362,17 @@ def update_project(
     if current is None:
         raise ProjectError("El proyecto no existe.")
 
-    new_provider = _validate_provider(
-        provider if provider is not None else current["provider"]
-        if "provider" in current.keys() else "supabase"
-    )
+    if provider is not None:
+        requested_provider = provider
+    elif project_ref is not None and not project_ref.strip():
+        # Vaciar explícitamente la referencia migra el proyecto a PostgreSQL
+        # genérico; omitir el campo conserva el proveedor y la referencia.
+        requested_provider = "postgres"
+    else:
+        requested_provider = (
+            current["provider"] if "provider" in current.keys() else "supabase"
+        )
+    new_provider = _validate_provider(requested_provider)
     new_slug = (slug or "").strip() or current["slug"]
     if new_slug != current["slug"]:
         if not _SLUG_RE.match(new_slug):
