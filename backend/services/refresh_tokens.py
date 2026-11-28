@@ -1,11 +1,11 @@
-"""Refresh tokens para la API web (M6).
+"""Refresh tokens persistentes para la API.
 
 El access token (JWT) es corto y viaja en `Authorization: Bearer`. La sesión
 de larga duración vive en un *refresh token* opaco guardado en cookie
 `HttpOnly` (inaccesible a JS), que se rota en cada uso y expira tras 7 días
 por defecto.
 
-Los tokens se persisten en SQLite (tabla `refresh_sessions`) para que las
+Los tokens se persisten en PostgreSQL (tabla `refresh_sessions`) para que las
 sesiones sobrevivan a reinicios del contenedor. Solo se guarda el hash
 SHA-256 del token, nunca el token en claro, de modo que un volcado de la BD
 no exponga credenciales utilizables.
@@ -98,7 +98,7 @@ class RefreshTokenStore:
 
 
 def purge_expired_sessions() -> int:
-    """Purga sesiones web expiradas (job semanal de retención). Devuelve nº eliminado.
+    """Purga sesiones expiradas (job semanal de retención). Devuelve nº eliminado.
 
     En uso normal `RefreshTokenStore` ya limpia vencidas en cada login/rotación,
     pero tras periodos sin actividad quedan filas; la purga semanal la cubre.
