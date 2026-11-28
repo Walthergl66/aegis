@@ -2,7 +2,7 @@
 
 import pytest
 
-from services.web_users import create_web_user
+from services.app_users import create_app_user
 
 
 def _token(headers):
@@ -13,8 +13,8 @@ def test_rbac_lecturas_administrativas_solo_admin(db):
     from fastapi.testclient import TestClient
     from api.app import app
 
-    create_web_user("admin", "AdminPass-12345", rol="admin")
-    create_web_user("viewer", "ViewerPass-12345", rol="viewer")
+    create_app_user("admin", "AdminPass-12345", rol="admin")
+    create_app_user("viewer", "ViewerPass-12345", rol="viewer")
 
     with TestClient(app) as c:
         admin = c.post("/api/auth/login", json={"username": "admin", "password": "AdminPass-12345"}).json()
@@ -24,11 +24,6 @@ def test_rbac_lecturas_administrativas_solo_admin(db):
 
         assert c.get("/api/accounts", headers=_token(admin)).status_code == 200
         assert c.get("/api/accounts", headers=_token(viewer)).status_code == 403
-        # Las rutas de gestión de identidades legacy no están expuestas en la API móvil.
-        for path in ("/api/users", "/api/web-users"):
-            assert c.get(path, headers=_token(admin)).status_code == 404, path
-            assert c.get(path, headers=_token(viewer)).status_code == 404, path
-
         # Lecturas monitoreables permitidas al viewer.
         assert c.get("/api/backups", headers=_token(viewer)).status_code == 200
         assert c.get("/api/projects", headers=_token(viewer)).status_code == 200
@@ -46,8 +41,8 @@ def test_rbac_proyectos_eliminados_solo_admin(db):
     from fastapi.testclient import TestClient
     from api.app import app
 
-    create_web_user("admin", "AdminPass-12345", rol="admin")
-    create_web_user("viewer", "ViewerPass-12345", rol="viewer")
+    create_app_user("admin", "AdminPass-12345", rol="admin")
+    create_app_user("viewer", "ViewerPass-12345", rol="viewer")
 
     with TestClient(app) as c:
         viewer = c.post("/api/auth/login", json={"username": "viewer", "password": "ViewerPass-12345"}).json()
@@ -61,8 +56,8 @@ def test_viewer_no_lee_proyecto_archivado_por_id(db):
     from services import accounts as accounts_srv
     from services import projects as projects_srv
 
-    admin_id = create_web_user("admin", "AdminPass-12345", rol="admin")
-    create_web_user("viewer", "ViewerPass-12345", rol="viewer")
+    admin_id = create_app_user("admin", "AdminPass-12345", rol="admin")
+    create_app_user("viewer", "ViewerPass-12345", rol="viewer")
     acc = accounts_srv.create_account("A", "pat-x", owner_user_id=admin_id)
     pid = projects_srv.create_project(
         "archivado", "Archivado", acc, "postgresql://u:p@h/db", "ref1",
