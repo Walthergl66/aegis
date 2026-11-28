@@ -8,12 +8,12 @@ from fastapi.testclient import TestClient
 
 from api.app import create_app
 from core import db
-from services import web_users as web_users_srv
+from services import app_users as app_users_srv
 
 
 @pytest.fixture
 def client(db):
-    user_id = web_users_srv.create_web_user("admin_totp", "abcdefghijklmno", rol="admin")
+    user_id = app_users_srv.create_app_user("admin_totp", "abcdefghijklmno", rol="admin")
     app = create_app()
     with TestClient(app) as c:
         c.app.state.user_id = user_id  # type: ignore[attr-defined]
@@ -29,13 +29,13 @@ def _login(client, user_id=None, code=None):
 
 def _secret_for(user_id):
     row = db.fetch_one(
-        "SELECT totp_secret, totp_pending_secret FROM web_users WHERE id = ?", (user_id,)
+        "SELECT totp_secret, totp_pending_secret FROM app_users WHERE id = ?", (user_id,)
     )
     return row["totp_pending_secret"] or row["totp_secret"]
 
 
 def test_login_sin_2fa_funciona(db):
-    web_users_srv.create_web_user("user1", "abcdefghijklmno", rol="viewer")
+    app_users_srv.create_app_user("user1", "abcdefghijklmno", rol="viewer")
     app = create_app()
     with TestClient(app) as c:
         r = c.post("/api/auth/login",
@@ -45,9 +45,9 @@ def test_login_sin_2fa_funciona(db):
 
 
 def test_totp_disabled_by_default(db):
-    web_users_srv.create_web_user("user2", "abcdefghijklmno", rol="viewer")
-    assert not web_users_srv.totp_enabled_for(
-        db.fetch_one("SELECT id FROM web_users WHERE username='user2'")["id"]
+    app_users_srv.create_app_user("user2", "abcdefghijklmno", rol="viewer")
+    assert not app_users_srv.totp_enabled_for(
+        db.fetch_one("SELECT id FROM app_users WHERE username='user2'")["id"]
     )
 
 
@@ -61,7 +61,7 @@ def test_setup_confirm_flow(client, db):
     assert "otpauth://totp/" in body["otpauth_url"]
     assert body["qr_svg"].startswith("data:image/svg+xml")
 
-    assert web_users_srv.totp_enabled_for(user_id) is False
+    assert app_users_srv.totp_enabled_for(user_id) is False
     secret = _secret_for(user_id)
     good_code = pyotp.TOTP(secret).now()
 
@@ -69,13 +69,13 @@ def test_setup_confirm_flow(client, db):
                json={"code": "000000"},
                headers={"Authorization": f"Bearer {tok}"})
     assert r.status_code == 400
-    assert web_users_srv.totp_enabled_for(user_id) is False
+    assert app_users_srv.totp_enabled_for(user_id) is False
 
     r = c.post("/api/auth/totp/confirm",
                json={"code": good_code},
                headers={"Authorization": f"Bearer {tok}"})
     assert r.status_code == 200
-    assert web_users_srv.totp_enabled_for(user_id) is True
+    assert app_users_srv.totp_enabled_for(user_id) is True
 
 
 def test_login_necesita_code_cuando_totp_activo(client, db):
@@ -129,12 +129,12 @@ def test_disable_totp_requiere_code_valido(client, db):
     r = c.post("/api/auth/totp/disable", json={"code": "invalido"},
                headers={"Authorization": f"Bearer {tok}"})
     assert r.status_code == 400
-    assert web_users_srv.totp_enabled_for(user_id) is True
+    assert app_users_srv.totp_enabled_for(user_id) is True
 
     r = c.post("/api/auth/totp/disable", json={"code": good_code},
                headers={"Authorization": f"Bearer {tok}"})
     assert r.status_code == 200
-    assert web_users_srv.totp_enabled_for(user_id) is False
+    assert app_users_srv.totp_enabled_for(user_id) is False
 
     r = _login(c)
     assert r.status_code == 200
@@ -155,12 +155,12 @@ def test_resetup_no_desactiva_2fa_sin_codigo(client, db):
     first_code = pyotp.TOTP(_secret_for(user_id)).now()
     c.post("/api/auth/totp/confirm", json={"code": first_code},
            headers={"Authorization": f"Bearer {tok}"})
-    assert web_users_srv.totp_enabled_for(user_id) is True
+    assert app_users_srv.totp_enabled_for(user_id) is True
 
     # Sin el código actual el setup se rechaza y el 2FA sigue activo.
     r = c.post("/api/auth/totp/setup", headers={"Authorization": f"Bearer {tok}"})
     assert r.status_code == 400
-    assert web_users_srv.totp_enabled_for(user_id) is True
+    assert app_users_srv.totp_enabled_for(user_id) is True
     assert _login(c).status_code == 401  # el login sigue pidiendo el 2FA original
 
     # Con el código actual sí se re-registra: el secreto nuevo queda pendiente
@@ -168,16 +168,16 @@ def test_resetup_no_desactiva_2fa_sin_codigo(client, db):
     r = c.post("/api/auth/totp/setup", json={"code": first_code},
                headers={"Authorization": f"Bearer {tok}"})
     assert r.status_code == 200
-    assert web_users_srv.totp_enabled_for(user_id) is True
+    assert app_users_srv.totp_enabled_for(user_id) is True
     assert _login(c, code=first_code).status_code == 200  # código original sigue valiendo
 
     pending = db.fetch_one(
-        "SELECT totp_pending_secret AS s FROM web_users WHERE id = ?", (user_id,)
+        "SELECT totp_pending_secret AS s FROM app_users WHERE id = ?", (user_id,)
     )["s"]
     assert pending == r.json()["secret"]
     new_code = pyotp.TOTP(pending).now()
     r = c.post("/api/auth/totp/confirm", json={"code": new_code},
                headers={"Authorization": f"Bearer {tok}"})
     assert r.status_code == 200
-    assert web_users_srv.totp_enabled_for(user_id) is True
-    assert web_users_srv.verify_totp_code(user_id, new_code) is True
+    assert app_users_srv.totp_enabled_for(user_id) is True
+    assert app_users_srv.verify_totp_code(user_id, new_code) is True
