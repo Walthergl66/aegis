@@ -3,23 +3,23 @@
 from __future__ import annotations
 
 import json as _json
+import logging
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 
-from api.rate_limit import _client_address, limiter, should_notify_rate_limit
-from api.throttle import should_notify_scan, throttle
+from api.rate_limit import _client_address, limiter, should_log_rate_limit
+from api.throttle import throttle
 from api.routes import accounts, audit, auth, backups, import_projects, projects
 from core.config import settings
-from notify import telegram as notify_mod
 DOCS_URL = "/api/docs"
 REDOC_URL = "/api/redoc"
 OPENAPI_URL = "/api/openapi.json"
 
 
 def create_app() -> FastAPI:
-    docs_enabled = settings().web_docs_enabled
+    docs_enabled = settings().api_docs_enabled
     app = FastAPI(
         title="Supabase Backups API",
         description="API REST para la app móvil de backups PostgreSQL.\n\n"
@@ -34,11 +34,10 @@ def create_app() -> FastAPI:
     app.state.limiter = limiter
 
     async def _rate_limit_handler(request, exc: RateLimitExceeded):
-        if should_notify_rate_limit():
+        if should_log_rate_limit():
             ip = _client_address(request)
-            await notify_mod.notify_admins(
-                f"🚨 Posible ataque de fuerza bruta: se superó el límite "
-                f"de intentos de login (HTTP 429) desde la IP {ip}."
+            logging.getLogger("security").warning(
+                "Límite de login superado desde IP %s", ip
             )
         return JSONResponse(
             {"detail": "Demasiados intentos. Espera un momento e inténtalo de nuevo."},
@@ -76,12 +75,9 @@ def create_app() -> FastAPI:
             ip = _client_address(request)
             crossed = throttle.hit(ip)
             if crossed:
-                if should_notify_scan():
-                    await notify_mod.notify_admins(
-                        f"🚨 Tráfico sospechoso hacia /api/*: se bloqueó "
-                        f"temporalmente la IP {ip} por superar el umbral "
-                        f"de peticiones."
-                    )
+                logging.getLogger("security").warning(
+                    "Se bloqueó temporalmente tráfico excesivo desde IP %s", ip
+                )
                 return JSONResponse(
                     {"detail": "Demasiadas peticiones. Intenta de nuevo en unos segundos."},
                     status_code=429,
