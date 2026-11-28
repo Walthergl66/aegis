@@ -1,4 +1,4 @@
-"""Saneado de secretos en textos que acaban en logs, historial o Telegram.
+"""Saneado de secretos en textos que acaban en logs, historial o respuestas de la API.
 
 La idea es un safety-net: ocultar patrones de credenciales antes de que una
 cadena (stderr de psql/pg_dump, errores HTTP, librerías) llegue a un mensaje
