@@ -1,9 +1,9 @@
-"""Seguridad de la interfaz web: hashing de contraseñas.
+"""Seguridad de la app: hashing de contraseñas.
 
 Contraseñas con PBKDF2-SHA256 y salt por usuario; el recuento de iteraciones
 se embebe en el hash para poder migrarlo sin relogin.
 
-Roles web:
+Roles de la app:
   - "admin":  acceso total (CRUD de cuentas, proyectos, usuarios y logs).
   - "viewer": solo lectura.
 """
