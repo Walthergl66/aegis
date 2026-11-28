@@ -3,7 +3,7 @@
 Cada proyecto activo con `schedule` (cron de 5 campos) recibe un job que
 ejecuta `backup_runner.run_backup` en un hilo y registra el resultado en
 `backup_history` + `audit_log`. Si el backup programado falla, se alerta a
-los admins por Telegram.
+los admins por .
 
 Los jobs se resincronizan con `resync()` (al arrancar y tras cualquier
 cambio de proyectos), así nunca quedan huérfanos ni duplicados: primero se
@@ -19,11 +19,8 @@ from apscheduler.triggers.cron import CronTrigger
 
 from backup import offsite as offsite_mod
 from backup import runner as backup_runner
-from core import sanitize
-from notify import telegram as notify_mod
 from services import audit as audit_srv
 from services import backup_history as history_srv
-from services import bot_projects
 from services import projects as projects_srv
 
 logger = logging.getLogger(__name__)
@@ -78,18 +75,11 @@ def resync() -> None:
 
 
 async def run_scheduled_backup(project_id: int) -> None:
-    """Job: ejecuta el backup de un proyecto y registra/avisa el resultado."""
+    """Job: ejecuta el backup de un proyecto y registra el resultado."""
     try:
         project = projects_srv.get_project(project_id, include_secret=True)
     except Exception as exc:  # noqa: BLE001 - no dejar morir el job del scheduler
         logger.exception("Job programado id=%s: no se pudo cargar el proyecto: %s", project_id, exc)
-        try:
-            await notify_mod.notify_admins(
-                "⚠️ Falló la carga de un backup programado. "
-                "Revisa los logs privados del servidor."
-            )
-        except Exception as notify_exc:  # noqa: BLE001
-            logger.error("No se pudo notificar el fallo de carga del backup: %s", notify_exc)
         return
     if project is None or not project.get("activo"):
         logger.info("Job programado ignorado: proyecto id=%s no está activo.", project_id)
@@ -104,8 +94,6 @@ async def run_scheduled_backup(project_id: int) -> None:
         log.exception("Backup programado '%s': %s", project["slug"], msg)
         history_srv.record(project_id, "error", detalle=msg)
         audit_srv.log_action("auto_backup", "error", project_id=project_id, detalle=msg)
-        if bot_projects.is_unowned(project_id):
-            await _alert_scheduled_failure(project["slug"], msg)
         return
 
     if result.ok:
@@ -124,19 +112,6 @@ async def run_scheduled_backup(project_id: int) -> None:
         audit_srv.log_action("auto_backup", "error", project_id=project_id,
                              detalle=f"programado: {result.detalle}")
         log.error("Backup programado FALLÓ para '%s': %s", project["slug"], result.detalle)
-        if bot_projects.is_unowned(project_id):
-            await _alert_scheduled_failure(project["slug"], result.detalle)
-
-
-async def _alert_scheduled_failure(slug: str, detail: str) -> None:
-    try:
-        await notify_mod.notify_admins(
-            "⚠️ Backup programado FALLÓ\n"
-            f"• Proyecto: {slug}\n"
-            f"• Motivo: {sanitize.redact_secrets(detail)}"
-        )
-    except Exception as exc:  # noqa: BLE001
-        logger.error("No se pudo notificar el fallo del backup programado: %s", exc)
 
 
 async def _sync_offsite() -> None:
