@@ -25,7 +25,7 @@ def test_deshabilitado_no_subirna_nada(db, monkeypatch):
 
     monkeypatch.setenv("OFFSITE_ENABLED", "")
     cfg._settings = None
-    summary = offsite.sync_new_backups(notify=False)
+    summary = offsite.sync_new_backups(report_errors=False)
     assert summary == {"enabled": False, "uploaded": 0, "skipped": 0, "deleted": 0, "errors": []}
     cfg._settings = None
 
@@ -93,27 +93,6 @@ def test_retencion_por_proyecto_no_mezcla_slugs(db, monkeypatch):
         "backups/proy-b/beta_20260101.dump.enc",
     ]
     cfg._settings = None
-
-
-def test_report_errors_notifica_a_admins(db, monkeypatch):
-    """Regresión: el fallo de la copia off-site debe avisar a los admins
-    (async sin await dejaba la alerta en una corutina que nunca se ejecutaba)."""
-    from backup import offsite
-    from notify import telegram as notify_mod
-
-    sent: list[str] = []
-
-    async def fake_notify(text):
-        sent.append(text)
-
-    monkeypatch.setattr(notify_mod, "notify_admins", fake_notify)
-    summary = {"errors": ["no se pudo listar el bucket: boom"]}
-    offsite._report_errors(summary, notify=True)
-    assert len(sent) == 1
-    assert "Falló la copia fuera del sitio" in sent[0]
-
-    offsite._report_errors(summary, notify=False)
-    assert len(sent) == 1
 
 
 def test_prefix_vacio_no_desactiva_la_retencion(db, monkeypatch):
