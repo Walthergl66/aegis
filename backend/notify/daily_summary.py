@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from core.config import settings
-from services import backup_history, projects
+from services import backup_history, bot_projects
 
 STALE_HOURS = 26
 _TIME_FMT = "%Y-%m-%d %H:%M:%S"
@@ -36,7 +36,7 @@ def _display_local(value: str, tz: ZoneInfo) -> str:
 
 
 def build_daily_summary() -> str:
-    active = projects.list_projects(only_active=True)
+    active = bot_projects.list_active()
     if not active:
         return ""
 
