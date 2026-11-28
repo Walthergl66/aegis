@@ -1,7 +1,7 @@
 """Cifrado en reposo de credenciales (PAT, cadenas de conexión).
 
 Usa Fernet con una clave maestra que vive SOLO en el .env, nunca en la
-base de datos ni en la interfaz web.
+base de datos ni en la app.
 """
 
 from __future__ import annotations
