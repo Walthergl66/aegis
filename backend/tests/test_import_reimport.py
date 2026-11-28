@@ -5,7 +5,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from services import projects as projects_srv
-from services.web_users import create_web_user
+from services.app_users import create_app_user
 from services.accounts import create_account
 
 
@@ -20,8 +20,8 @@ def _fake_refs():
 def test_reimportar_reutiliza_cuenta_con_mismo_pat(db):
     from services import accounts as accounts_srv
 
-    a1 = create_account("Importada desde bot", "sbp_abc")
-    a2 = create_account("Importada desde bot", "sbp_abc")
+    a1 = create_account("Importada desde ", "sbp_abc")
+    a2 = create_account("Importada desde ", "sbp_abc")
     a3 = create_account("Otra cuenta", "sbp_xyz")
 
     assert a2 == a1, "mismo PAT debe reutilizar la cuenta"
@@ -36,7 +36,7 @@ def test_reimportar_reutiliza_cuenta_con_mismo_pat(db):
 def test_proyecto_eliminado_vuelve_a_disponible(db):
     from api.app import app
 
-    create_web_user("admin", "AdminPass-12345", rol="admin")
+    create_app_user("admin", "AdminPass-12345", rol="admin")
     with TestClient(app) as c:
         admin = c.post("/api/auth/login", json={"username": "admin", "password": "AdminPass-12345"}).json()
         h = _token(admin)
