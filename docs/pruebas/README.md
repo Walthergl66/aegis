@@ -1,22 +1,17 @@
 # Pruebas
 
-La suite automatizada está en `backend/tests/`; instalar dependencias de desarrollo y ejecutar desde `backend/`:
+Las pruebas del backend requieren una base PostgreSQL dedicada mediante `TEST_DATABASE_URL`. Cada test con persistencia crea su propio esquema temporal y lo elimina al terminar.
 
-```bash
-pip install -r requirements-dev.txt
+```sh
+cd backend
 pytest -p no:cacheprovider
 ```
 
-El flag desactiva `.pytest_cache` en el repositorio. `tests/conftest.py` prepara SQLite y directorios temporales por test. Si un test modifica variables de entorno, debe limpiar el singleton de settings (`cfg._settings = None`) para que la siguiente lectura refleje la nueva configuración.
+Sin `TEST_DATABASE_URL`, las pruebas que requieren persistencia se omiten. No uses una base con datos reales como destino de pruebas.
 
-## Cobertura agrupada
+Para la app Expo:
 
-| Área | Archivos representativos |
-|---|---|
-| Acceso, RBAC y calidad API | `test_api_rbac.py`, `test_api_quality.py`, `test_bot_access.py` |
-| Autenticación y permisos | `test_login_lockout.py`, `test_refresh_tokens_persist.py`, `test_access_token_revocation.py`, `test_totp.py`, `test_web_users_permissions.py` |
-| Backups, cifrado y limpieza | `test_crypto_cleanup.py`, `test_offsite.py`, `test_retention_rate_limit.py` |
-| Proveedores PostgreSQL/Supabase, modelo y prueba de conexión API | `test_postgres_providers.py`, `test_postgres_projects.py`, `test_api_projects_postgres.py`, `test_generic_postgres.py` |
-| Opciones de `pg_dump` | `test_backup_options.py` |
-| Supabase/importación | `test_import_pooler.py`, `test_import_reimport.py` |
-| Cron y notificaciones | `test_slug_schedule.py`, `test_daily_summary.py`, `test_messaging_hardening.py` |
+```sh
+cd mobile
+npm run typecheck
+```
