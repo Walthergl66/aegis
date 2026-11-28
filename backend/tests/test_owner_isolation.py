@@ -2,7 +2,7 @@
 
 from fastapi.testclient import TestClient
 
-from services.web_users import create_web_user
+from services.app_users import create_app_user
 
 
 def _headers(client: TestClient, username: str, password: str) -> dict[str, str]:
@@ -17,8 +17,8 @@ def test_usuario_no_lee_ni_modifica_recursos_de_otra_cuenta(db, tmp_path):
     from core.config import settings
     from services import accounts, audit, backup_history, projects
 
-    owner_a = create_web_user("cuenta-a", "Password-A-12345", rol="admin")
-    owner_b = create_web_user("cuenta-b", "Password-B-12345", rol="admin")
+    owner_a = create_app_user("cuenta-a", "Password-A-12345", rol="admin")
+    owner_b = create_app_user("cuenta-b", "Password-B-12345", rol="admin")
     account_a = accounts.create_account(
         "A", "", provider="postgres", owner_user_id=owner_a
     )
@@ -41,7 +41,7 @@ def test_usuario_no_lee_ni_modifica_recursos_de_otra_cuenta(db, tmp_path):
     backup_file.write_bytes(b"encrypted-placeholder")
     backup_id = backup_history.record(project_b, "ok", ruta_archivo=str(backup_file))
     audit.log_action(
-        "cross_owner_probe", "ok", web_user_id=owner_a, project_id=project_b
+        "cross_owner_probe", "ok", app_user_id=owner_a, project_id=project_b
     )
 
     with TestClient(app) as client:
