@@ -2,7 +2,7 @@
 
 Valida PATs, lista proyectos y obtiene connection strings desde la API
 oficial de Supabase. Todas las funciones son bloqueantes (usar con
-`asyncio.to_thread` desde el bot).
+`asyncio.to_thread` desde los handlers asíncronos).
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ def validate_pat(pat: str) -> tuple[bool, str]:
 
     Devuelve (es_valido, mensaje). El mensaje es siempre genérico: no incluye
     detalles de red/TLS/host (se filtra cualquier exc) para no revelar
-    infraestructura al usuario del bot.
+    infraestructura al usuario de la app.
     """
     headers = {"Authorization": f"Bearer {pat}", "Accept": "application/json"}
     try:
