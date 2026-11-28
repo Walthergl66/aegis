@@ -113,7 +113,7 @@ async def create_imported_projects(request: Request, admin: dict = Depends(requi
 
     audit_srv.log_action(
         "mobile_import_supabase",
-        "ok", web_user_id=admin["id"],
+        "ok", app_user_id=admin["id"],
         detalle=f"{created} proyectos importados, {len(errors)} errores, "
                 + f"cuenta {account_name}",
     )
