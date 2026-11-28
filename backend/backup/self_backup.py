@@ -65,7 +65,7 @@ def _rotate(dest_dir: Path) -> None:
 
 
 async def send_latest_to_telegram() -> None:
-    """Envía el self-backup más reciente a los admins (descifrado en memoria)."""
+    """Envía el self-backup cifrado más reciente a los admins."""
     from notify import telegram as notify_mod
 
     dest_dir: Path = settings().self_backup_dir
@@ -77,20 +77,10 @@ async def send_latest_to_telegram() -> None:
         logger.info("No hay self-backups para enviar por Telegram.")
         return
     newest = files[-1]
-    try:
-        data = crypto_mod.decrypt_file_bytes(newest)
-    except Exception as exc:
-        logger.error("No se pudo descifrar el self-backup para enviar: %s", exc)
-        await notify_mod.notify_admins("⚠️ No se pudo descifrar el self-backup de la base para enviarlo.")
-        return
-
-    # Se envía YA descifrado (en memoria): el nombre debe reflejarlo. Prefijarlo
-    # todavía con ".enc" haría creer a un admin que el archivo está cifrado.
-    plain_name = newest.name.removesuffix(".enc")
     await notify_mod.notify_admins_document(
-        plain_name,
-        data,
-        caption=f"Self-backup de la base del panel ({plain_name}, contenido descifrado)",
+        newest.name,
+        newest.read_bytes(),
+        caption=f"Self-backup cifrado de la base del panel ({newest.name})",
     )
 
 
