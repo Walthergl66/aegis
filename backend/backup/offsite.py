@@ -1,13 +1,4 @@
-"""Copia fuera del sitio de los backups `.enc` (S3 / R2 / B2 / MinIO).
-
-Cada archivo cifrado que aparece en `BACKUP_DIR` se sube a un bucket S3
-compatible usando boto3. Después de subir se aplica retención remota:
-se borran los objetos más antiguos por encima de `OFFSITE_KEEP_COUNT`.
-
-Si algo falla, se avisa a los admins de Telegram con el detalle; los
-archivos se re-sincronizan en el siguiente arranque o backup con éxito
-(los que ya están remotos se saltan).
-"""
+"""Sincroniza copias cifradas con un destino S3 compatible."""
 
 from __future__ import annotations
 
@@ -60,7 +51,7 @@ def list_remote_keys() -> list[str]:
     return keys
 
 
-def sync_new_backups(notify: bool = True) -> dict:
+def sync_new_backups(report_errors: bool = True) -> dict:
     """Sube los `.enc` nuevos y aplica retención remota. Devuelve resumen."""
     cfg = settings()
     summary = {"enabled": False, "uploaded": 0, "skipped": 0, "deleted": 0, "errors": []}
@@ -77,7 +68,7 @@ def sync_new_backups(notify: bool = True) -> dict:
         remote = set(list_remote_keys())
     except Exception as exc:  # noqa: BLE001
         summary["errors"].append(f"no se pudo listar el bucket: {exc}")
-        _report_errors(summary, notify)
+        _report_errors(summary, report_errors)
         return summary
 
     new_files = [
@@ -93,7 +84,7 @@ def sync_new_backups(notify: bool = True) -> dict:
             summary["errors"].append(f"{quote(key)}: {exc}")
 
     if summary["errors"]:
-        _report_errors(summary, notify)
+        _report_errors(summary, report_errors)
 
     if cfg.offsite_keep_count > 0:
         try:
@@ -148,18 +139,10 @@ def _apply_retention(client, cfg, keys: list[str], bucket: str | None = None) ->
     return deleted
 
 
-def _report_errors(summary: dict, notify: bool) -> None:
-    if not notify or not summary["errors"]:
+def _report_errors(summary: dict, enabled: bool) -> None:
+    if not enabled or not summary["errors"]:
         return
-    from notify import telegram as notify_mod
     from core import sanitize
 
     detail = "\n".join(f"- {sanitize.redact_secrets(e)}" for e in summary["errors"][:10])
     logger.error("Falló la copia fuera del sitio:\n%s", detail)
-    try:
-        notify_mod.notify_admins_sync(
-            "⚠️ Falló la copia fuera del sitio de algunos backups. "
-            "Revisa los logs privados del servidor para ver los detalles."
-        )
-    except Exception as exc:  # noqa: BLE001
-        logger.error("No se pudo notificar el fallo de la copia off-site: %s", exc)
