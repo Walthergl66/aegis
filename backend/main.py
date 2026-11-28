@@ -1,12 +1,4 @@
-"""Punto de entrada: levanta la web (FastAPI) y el bot (Telegram) en un
-mismo proceso para simplificar el despliegue con Docker.
-
-¿Por qué un solo proceso en vez de dos servicios? A esta escala un único
-contenedor con `restart: unless-stopped` es más fácil de operar, comparte
-un solo SQLite sin problemas de acceso entre procesos y consume menos
-recursos. Si en el futuro se quisiera escalar, la capa de datos ya está
-desacoplada en `services/` para migrar a Postgres y separar los procesos.
-"""
+"""Arranque del servicio API y sus tareas de mantenimiento."""
 
 from __future__ import annotations
 
@@ -23,59 +15,41 @@ from api.app import create_app
 from backup import cleanup as cleanup_mod
 from backup import offsite as offsite_mod
 from backup import scheduler_jobs
-from backup import self_backup as self_backup_mod
-from backup import web_jobs
-from bot import build_application, run_bot_forever
+from backup import requested_jobs
 from core import db as db_core
 from core.config import settings
-from notify import telegram as notify_mod
-from notify.daily_summary import send_daily_summary as _send_daily_summary
 from services import audit as audit_srv
 from services import backup_history as history_srv
 from services import refresh_tokens as refresh_srv
 
 
-def _split_time(value: str) -> tuple[int, int]:
-    hora, minuto = value.split(":")
-    return int(hora), int(minuto)
-
-
 def _setup_logging() -> None:
     cfg = settings()
-    log_dir = cfg.db_path.parent / "logs"
+    log_dir = cfg.backup_dir.parent / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
 
     root = logging.getLogger()
     root.setLevel(getattr(logging, cfg.log_level, logging.INFO))
-
-    formatter = logging.Formatter(
-        "%(asctime)s %(levelname)s [%(name)s] %(message)s"
-    )
+    formatter = logging.Formatter("%(asctime)s %(levelname)s [%(name)s] %(message)s")
     console = logging.StreamHandler()
     console.setFormatter(formatter)
     root.addHandler(console)
-
     file_handler = RotatingFileHandler(
         log_dir / "app.log", maxBytes=1_000_000, backupCount=3, encoding="utf-8"
     )
     file_handler.setFormatter(formatter)
     root.addHandler(file_handler)
-
-    # Silencia logs muy ruidosos de librerías de terceros.
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
-    logging.getLogger("telegram").setLevel(logging.INFO)
 
 
 def retention_purge() -> dict:
-    """Purga audit_log, backup_history y refresh_sessions por antigüedad."""
     cfg = settings()
-    removal = {
+    return {
         "audit": audit_srv.purge_old(cfg.audit_retention_days),
         "history": history_srv.purge_old(cfg.history_retention_days),
         "sessions": refresh_srv.purge_expired_sessions(),
     }
-    return removal
 
 
 async def retention_purge_job(log: logging.Logger) -> None:
@@ -83,113 +57,19 @@ async def retention_purge_job(log: logging.Logger) -> None:
         removal = await asyncio.to_thread(retention_purge)
         log.info("Purga de retención: audit=%d history=%d sessions=%d",
                  removal["audit"], removal["history"], removal["sessions"])
-    except Exception as exc:  # noqa: BLE001
-        log.exception("Falló la purga de retención de logs")
-
-
-async def daily_summary_job(log: logging.Logger) -> None:
-    """Resumen diario de salud de los backups por Telegram."""
-    if not settings().daily_summary_enabled:
-        return
-    try:
-        await asyncio.to_thread(_send_daily_summary)
-        log.info("Resumen diario enviado a los admins.")
-    except Exception as exc:  # noqa: BLE001
-        log.exception("Falló el resumen diario por Telegram: %s", exc)
-        try:
-            await notify_mod.notify_admins(
-                "⚠️ Falló el resumen diario de backups. Revisa los logs del contenedor."
-            )
-        except Exception as notify_exc:  # noqa: BLE001
-            log.error("Y además falló la alerta por Telegram: %s", notify_exc)
-
-
-async def daily_self_backup_job(log: logging.Logger) -> None:
-    """Self-backup diario de la base de datos + envío a Telegram (opcional)."""
-    if settings().database_url:
-        return  # Supabase gestiona las copias de la base PostgreSQL.
-    try:
-        enc = await asyncio.to_thread(self_backup_mod.run_self_backup)
-        if enc.exists():
-            log.info("Self-backup diario creado: %s (%d bytes)", enc.name, enc.stat().st_size)
-        if settings().self_backup_telegram:
-            await self_backup_mod.send_latest_to_telegram()
-    except Exception as exc:  # noqa: BLE001
-        log.exception("Falló el self-backup diario de la base: %s", exc)
-        try:
-            await notify_mod.notify_admins(
-                "⚠️ Falló el self-backup diario de la base. Revisa los logs del contenedor."
-            )
-        except Exception as notify_exc:  # noqa: BLE001
-            log.error("Y además falló la alerta por Telegram: %s", notify_exc)
+    except Exception:  # noqa: BLE001
+        log.exception("Falló la purga de retención")
 
 
 def setup_scheduler(log: logging.Logger) -> AsyncIOScheduler:
-    """Agenda el self-backup diario a la hora y zona configuradas (UTC por defecto)."""
-    cfg = settings()
-    try:
-        tzinfo = ZoneInfo(cfg.self_backup_tz)
-    except Exception:  # noqa: BLE001 - zona inválida: se cae a UTC
-        tzinfo = ZoneInfo("UTC")
-
-    try:
-        summary_tzinfo = ZoneInfo(cfg.daily_summary_tz)
-    except Exception:  # noqa: BLE001 - zona inválida: se cae a UTC
-        summary_tzinfo = ZoneInfo("UTC")
-
-    hour, minute = 3, 0
-    try:
-        hora, minuto = cfg.self_backup_time.split(":")
-        hour, minute = int(hora), int(minuto)
-    except Exception:  # noqa: BLE001 - formato inválido: se cae a 03:00
-        pass
-
-    scheduler = AsyncIOScheduler(timezone=tzinfo)
-    if not cfg.database_url:
-        scheduler.add_job(
-            daily_self_backup_job,
-            CronTrigger(hour=hour, minute=minute, timezone=tzinfo),
-            args=[log],
-            id="self_backup_daily",
-            misfire_grace_time=3600,
-            coalesce=True,
-        )
-        log.info(
-            "Self-backup diario de SQLite programado a las %02d:%02d (%s)",
-            hour, minute, tzinfo,
-        )
-    scheduler.start()
-
+    scheduler = AsyncIOScheduler(timezone=ZoneInfo("UTC"))
     scheduler.add_job(
         retention_purge_job,
-        CronTrigger(day_of_week="mon", hour=4, minute=0, timezone=tzinfo),
-        args=[log],
-        id="retention_weekly",
-        misfire_grace_time=3600,
-        coalesce=True,
+        CronTrigger(day_of_week="mon", hour=4, minute=0, timezone=ZoneInfo("UTC")),
+        args=[log], id="retention_weekly", misfire_grace_time=3600, coalesce=True,
     )
-    log.info(
-        "Purga semanal de logs programada (lunes 04:00 %s): audit=%d días, history=%d días",
-        tzinfo, settings().audit_retention_days, settings().history_retention_days,
-    )
-
-    if cfg.daily_summary_enabled:
-        try:
-            summary_hour, summary_min = _split_time(cfg.daily_summary_time)
-        except Exception:  # noqa: BLE001 - formato inválido: se cae a 08:00
-            summary_hour, summary_min = 8, 0
-        scheduler.add_job(
-            daily_summary_job,
-            CronTrigger(hour=summary_hour, minute=summary_min, timezone=summary_tzinfo),
-            args=[log],
-            id="daily_summary",
-            misfire_grace_time=3600,
-            coalesce=True,
-        )
-        log.info(
-            "Resumen diario por Telegram programado a las %02d:%02d (%s)",
-            summary_hour, summary_min, summary_tzinfo,
-        )
+    scheduler.start()
+    log.info("Purga semanal programada (lunes 04:00 UTC)")
     return scheduler
 
 
@@ -199,69 +79,43 @@ async def main() -> None:
     log = logging.getLogger("main")
 
     db_core.init_db()
-    if not cfg.database_url:
-        self_backup_mod.maiden_run_safe()
     retention_purge()
     removed = cleanup_mod.sweep_plaintext_backups()
     if removed:
-        log.warning("Se encontraron y eliminaron archivos de backup en claro: %s", "; ".join(removed[:10]))
-        try:
-            await notify_mod.notify_admins(
-                "⚠️ Se encontraron backups SIN CIFRAR (restos de un proceso "
-                "interrumpido) y se eliminaron por seguridad. "
-                "Revisa los logs privados del servidor para ver los detalles."
-            )
-        except Exception as exc:  # noqa: BLE001
-            log.error("No se pudo alertar del barrido de claros: %s", exc)
+        log.warning("Se eliminaron backups temporales sin cifrar: %s", "; ".join(removed[:10]))
 
     if cfg.offsite_enabled:
         try:
-            offsite = await asyncio.to_thread(offsite_mod.sync_new_backups)
-            log.info(
-                "Copia off-site al arranque: %d subido(s), %d en remoto, %d borrado(s) "
-                "(errores: %d)",
-                offsite["uploaded"], offsite["skipped"], offsite["deleted"], len(offsite["errors"]),
-            )
-        except Exception as exc:  # noqa: BLE001
-            log.error("Copia off-site al arranque falló: %s", exc)
+            result = await asyncio.to_thread(offsite_mod.sync_new_backups)
+            log.info("Copia remota al arranque: %d subido(s), %d en remoto, %d borrado(s), %d error(es)",
+                     result["uploaded"], result["skipped"], result["deleted"], len(result["errors"]))
+        except Exception:  # noqa: BLE001
+            log.exception("Copia remota al arranque falló")
 
     app = create_app()
-    bot_app = build_application()
-    config = uvicorn.Config(
-        app,
-        host=cfg.web_host,
-        port=cfg.web_port,
-        log_level="info",
-        proxy_headers=True,
-        forwarded_allow_ips=cfg.forwarded_allow_ips,
-    )
-    server = uvicorn.Server(config)
-
+    server = uvicorn.Server(uvicorn.Config(
+        app, host=cfg.api_host, port=cfg.api_port, log_level="info",
+        proxy_headers=True, forwarded_allow_ips=cfg.forwarded_allow_ips,
+    ))
     scheduler = setup_scheduler(log)
     scheduler_jobs.bind(scheduler)
     scheduler_jobs.resync()
-    db_core.execute("UPDATE backup_jobs SET status = 'interrupted', finished_at = datetime('now'), detail = 'El proceso terminó durante la ejecución.' WHERE status = 'running'")
-    backup_jobs_task = asyncio.create_task(web_jobs.run_forever())
-    bot_task = asyncio.create_task(run_bot_forever(bot_app))
-    log.info("API móvil escuchando en http://%s:%s", cfg.web_host, cfg.web_port)
+    db_core.execute(
+        "UPDATE backup_jobs SET status = 'interrupted', finished_at = datetime('now'), "
+        "detail = 'El proceso terminó durante la ejecución.' WHERE status = 'running'"
+    )
+    jobs_task = asyncio.create_task(requested_jobs.run_forever())
+    log.info("API escuchando en %s:%s", cfg.api_host, cfg.api_port)
     try:
         await server.serve()
     finally:
         scheduler.shutdown(wait=False)
-        backup_jobs_task.cancel()
-        bot_task.cancel()
+        jobs_task.cancel()
         try:
-            await backup_jobs_task
-        except asyncio.CancelledError:
-            pass
-        try:
-            await bot_task
+            await jobs_task
         except asyncio.CancelledError:
             pass
 
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        pass
+    asyncio.run(main())
