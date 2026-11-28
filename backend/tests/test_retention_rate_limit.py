@@ -60,10 +60,10 @@ def test_audit_listado_paginado(db):
 
 
 def test_audit_expone_fecha_y_origen(db):
-    web_id = db.execute("INSERT INTO web_users (username, password_hash, rol) VALUES ('admin', 'x', 'admin')")
+    account_id = db.execute("INSERT INTO app_users (username, password_hash, rol) VALUES ('admin', 'x', 'admin')")
     db.execute(
-        "INSERT INTO audit_log (accion, resultado, web_user_id) VALUES ('accion', 'ok', ?)",
-        (web_id,),
+        "INSERT INTO audit_log (accion, resultado, app_user_id) VALUES ('accion', 'ok', ?)",
+        (account_id,),
     )
     rows = audit.list_audit()
     assert len(rows) == 1
